@@ -4,6 +4,8 @@ import os
 import sys
 from typing import Dict, List, Optional
 
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+
 from excel_parser import load_excel, SOWData, get_month_range
 from forecast_engine import (
     forecast_portfolio,
@@ -24,6 +26,7 @@ def run_pipeline(
     forecast_months: int = 12,
     growth_overrides: Optional[Dict[str, float]] = None,
     contribution_overrides: Optional[Dict[str, float]] = None,
+    sow_contribution_overrides: Optional[Dict[str, float]] = None,
 ) -> dict:
     sow_list = load_excel(excel_path)
 
@@ -35,6 +38,7 @@ def run_pipeline(
         forecast_months=forecast_months,
         growth_overrides=growth_overrides,
         contribution_overrides=contribution_overrides,
+        sow_contribution_overrides=sow_contribution_overrides,
     )
 
     forecast_month_labels = get_forecast_months(sow_list, forecast_months)
@@ -120,7 +124,7 @@ def run_pipeline(
         "asset_vs_liability": asset_liability,
         "net_worth_growth": net_worth_growth,
         "forecasts": forecasts,
-        "assumptions": _build_assumptions(sow_list, growth_overrides, contribution_overrides),
+        "assumptions": _build_assumptions(sow_list, growth_overrides, contribution_overrides, sow_contribution_overrides),
     }
 
 
@@ -128,9 +132,11 @@ def _build_assumptions(
     sow_list: List[SOWData],
     growth_overrides: Optional[Dict[str, float]],
     contribution_overrides: Optional[Dict[str, float]],
+    sow_contribution_overrides: Optional[Dict[str, float]] = None,
 ) -> dict:
     growth_overrides = growth_overrides or {}
     contribution_overrides = contribution_overrides or {}
+    sow_contribution_overrides = sow_contribution_overrides or {}
 
     used_types = set(s.sow_type for s in sow_list)
     assumptions = {}
@@ -149,6 +155,24 @@ def _build_assumptions(
             if stype in growth_overrides or stype in contribution_overrides
             else "default",
         }
+
+    for sow_name, amount in sow_contribution_overrides.items():
+        for sow in sow_list:
+            if sow.name == sow_name:
+                stype = sow.sow_type
+                if stype not in assumptions:
+                    info = get_sow_type(stype)
+                    assumptions[stype] = {
+                        "label": info.label,
+                        "growth_rate": growth_overrides.get(
+                            stype, info.default_annual_growth
+                        ),
+                        "monthly_contribution": info.default_monthly_contribution,
+                        "source": "default",
+                    }
+                assumptions[stype].setdefault("sow_overrides", {})
+                assumptions[stype]["sow_overrides"][sow_name] = amount
+                break
 
     return assumptions
 
@@ -189,7 +213,13 @@ def main():
         "--contribution",
         type=str,
         default="",
-        help="Monthly contribution overrides: type=amount,type=amount",
+        help="Monthly contribution overrides by type: type=amount,type=amount (e.g., investment=500)",
+    )
+    run_parser.add_argument(
+        "--sow-contribution",
+        type=str,
+        default="",
+        help="Monthly contribution overrides by SOW name: name=amount,name=amount (e.g., 'HSBC Savings=35000')",
     )
     run_parser.add_argument(
         "--output",
@@ -197,16 +227,22 @@ def main():
         default="",
         help="Output file path for JSON results (default: print to stdout)",
     )
+    run_parser.add_argument(
+        "--visualize",
+        action="store_true",
+        default=False,
+        help="Generate an interactive HTML dashboard with charts",
+    )
 
     args = parser.parse_args()
 
     if args.command == "generate-sample":
         from generate_sample import generate_sample_excel
 
-        path = os.path.join(
-            os.path.dirname(os.path.abspath(__file__)),
-            "sample_wealth_data.xlsx",
-        )
+        project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+        out_dir = os.path.join(project_root, "output")
+        os.makedirs(out_dir, exist_ok=True)
+        path = os.path.join(out_dir, "sample_wealth_data.xlsx")
         result_path = generate_sample_excel(path)
         print(f"Sample Excel generated: {result_path}")
         return
@@ -226,11 +262,19 @@ def main():
                     key, val = pair.split("=", 1)
                     contribution_overrides[key.strip()] = float(val.strip())
 
+        sow_contribution_overrides = {}
+        if args.sow_contribution:
+            for pair in args.sow_contribution.split(","):
+                if "=" in pair:
+                    key, val = pair.split("=", 1)
+                    sow_contribution_overrides[key.strip()] = float(val.strip())
+
         result = run_pipeline(
             excel_path=args.excel,
             forecast_months=args.forecast_months,
             growth_overrides=growth_overrides or None,
             contribution_overrides=contribution_overrides or None,
+            sow_contribution_overrides=sow_contribution_overrides or None,
         )
 
         if args.output:
@@ -239,6 +283,16 @@ def main():
             print(f"Results saved to: {args.output}")
         else:
             print(json.dumps(result, indent=2, default=str))
+
+        if args.visualize:
+            from visualize import generate_visualizations
+            project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+            default_out_dir = os.path.join(project_root, "output")
+            out_dir = os.path.dirname(os.path.abspath(args.output)) if args.output else default_out_dir
+            os.makedirs(out_dir, exist_ok=True)
+            viz_files = generate_visualizations(result, out_dir)
+            for vf in viz_files:
+                print(f"Visualization generated: {vf}")
 
     else:
         parser.print_help()

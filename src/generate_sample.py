@@ -133,9 +133,9 @@ def _build_sample_data(months: List[str]) -> List[list]:
 
 
 if __name__ == "__main__":
-    path = os.path.join(
-        os.path.dirname(os.path.abspath(__file__)),
-        "sample_wealth_data.xlsx",
-    )
+    project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    out_dir = os.path.join(project_root, "output")
+    os.makedirs(out_dir, exist_ok=True)
+    path = os.path.join(out_dir, "sample_wealth_data.xlsx")
     result = generate_sample_excel(path)
     print(f"Sample Excel generated: {result}")

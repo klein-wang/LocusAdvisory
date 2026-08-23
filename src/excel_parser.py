@@ -51,12 +51,10 @@ def load_excel(file_path: str) -> List[SOWData]:
     except Exception as pandas_err:
         try:
             return _load_via_openpyxl(file_path)
+        except FileNotFoundError:
+            raise
         except Exception as openpyxl_err:
-            raise FileNotFoundError(
-                f"Failed to read Excel file: {file_path}.\n"
-                f"Pandas error: {pandas_err}\n"
-                f"OpenPyXL error: {openpyxl_err}"
-            )
+            raise type(openpyxl_err)(str(openpyxl_err)) from openpyxl_err
 
 
 def _load_via_pandas(file_path: str) -> List[SOWData]:

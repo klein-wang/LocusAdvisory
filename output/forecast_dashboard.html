@@ -1,0 +1,202 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>LocusAdvisory - Wealth Forecast Dashboard</title>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+<style>
+  :root {
+    --bg: #f5f6fa; --card: #ffffff; --text: #2c3e50; --muted: #7f8c8d;
+    --border: #ecf0f1; --accent: #3498db; --pos: #27ae60; --neg: #e74c3c;
+  }
+  * { box-sizing: border-box; }
+  body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: var(--bg); margin: 0; padding: 24px; color: var(--text); }
+  .container { max-width: 1200px; margin: 0 auto; }
+  .header { background: var(--card); border-radius: 12px; padding: 28px 32px; margin-bottom: 24px; box-shadow: 0 2px 12px rgba(0,0,0,0.06); }
+  .header h1 { margin: 0 0 4px 0; font-size: 26px; }
+  .header .subtitle { color: var(--muted); font-size: 14px; }
+  .kpi-row { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 16px; margin-bottom: 24px; }
+  .kpi { background: var(--card); border-radius: 12px; padding: 20px; box-shadow: 0 2px 8px rgba(0,0,0,0.04); }
+  .kpi .label { font-size: 12px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.8px; margin-bottom: 6px; }
+  .kpi .value { font-size: 26px; font-weight: 700; }
+  .kpi .sub { font-size: 13px; color: var(--muted); margin-top: 2px; }
+  .card { background: var(--card); border-radius: 12px; padding: 24px 28px; margin-bottom: 24px; box-shadow: 0 2px 8px rgba(0,0,0,0.04); }
+  .card h2 { margin: 0 0 16px 0; font-size: 17px; }
+  .chart-wrap { position: relative; height: 460px; }
+  .chart-row { display: grid; grid-template-columns: 1fr 380px; gap: 24px; margin-bottom: 24px; }
+  @media (max-width: 900px) { .chart-row { grid-template-columns: 1fr; } }
+  table { width: 100%; border-collapse: collapse; margin-top: 8px; }
+  th, td { padding: 11px 14px; text-align: right; border-bottom: 1px solid var(--border); font-size: 13px; }
+  th:first-child, td:first-child { text-align: left; }
+  th { background: #f8f9fa; font-weight: 600; color: var(--text); }
+  .positive { color: var(--pos); }
+  .negative { color: var(--neg); }
+  .section-label { display: inline-block; background: var(--accent); color: #fff; padding: 2px 10px; border-radius: 10px; font-size: 11px; margin-left: 8px; vertical-align: middle; }
+</style>
+</head>
+<body>
+<div class="container">
+  <div class="header">
+    <h1>LocusAdvisory - Wealth Forecast Dashboard</h1>
+    <div class="subtitle">Projected 12-month growth & allocation across all SOW assets</div>
+  </div>
+
+  <div class="kpi-row">
+    <div class="kpi">
+      <div class="label">Start Net Worth</div>
+      <div class="value">$431,134</div>
+      <div class="sub">2026-09</div>
+    </div>
+    <div class="kpi">
+      <div class="label">Forecast End Net Worth</div>
+      <div class="value">$893,752</div>
+      <div class="sub">2028-02</div>
+    </div>
+    <div class="kpi">
+      <div class="label">Total Growth</div>
+      <div class="value positive">&#9650; +107.30%</div>
+      <div class="sub">Over 2026-09 → 2028-02</div>
+    </div>
+    <div class="kpi">
+      <div class="label">Monthly CAGR</div>
+      <div class="value">+4.3800%</div>
+      <div class="sub">Compound monthly rate</div>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>Growth Trend by SOW Name <span class="section-label">Historical + Forecast</span></h2>
+    <div class="chart-wrap"><canvas id="trendChart"></canvas></div>
+  </div>
+
+  <div class="chart-row">
+    <div class="card" style="margin-bottom:0">
+      <h2>Forecast End Value by SOW</h2>
+      <div class="chart-wrap"><canvas id="barChart"></canvas></div>
+    </div>
+    <div class="card" style="margin-bottom:0">
+      <h2>Asset Allocation</h2>
+      <div class="chart-wrap" style="height:360px"><canvas id="pieChart"></canvas></div>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>SOW Detail</h2>
+    <table>
+      <thead><tr><th>SOW Name</th><th>Type</th><th>Latest Value</th><th>Forecast End</th><th>Growth</th></tr></thead>
+      <tbody>
+      <tr>
+        <td>Cash Wallet</td>
+        <td>Cash & Equivalents</td>
+        <td>$30.00</td>
+        <td>$30.00</td>
+        <td class="positive">+0.00%</td>
+      </tr>
+      <tr>
+        <td>Octopus</td>
+        <td>Cash & Equivalents</td>
+        <td>$59.00</td>
+        <td>$59.00</td>
+        <td class="positive">+0.00%</td>
+      </tr>
+      <tr>
+        <td>HSBC Savings</td>
+        <td>Savings Accounts</td>
+        <td>$239,438.69</td>
+        <td>$713,269.73</td>
+        <td class="positive">+197.89%</td>
+      </tr>
+      <tr>
+        <td>CMWB Savings</td>
+        <td>Savings Accounts</td>
+        <td>$12,770.20</td>
+        <td>$13,446.47</td>
+        <td class="positive">+5.30%</td>
+      </tr>
+      <tr>
+        <td>Longbridge Investment</td>
+        <td>Investments</td>
+        <td>$160,000.00</td>
+        <td>$174,613.89</td>
+        <td class="positive">+9.13%</td>
+      </tr>
+      <tr>
+        <td>Earnmore Credit</td>
+        <td>Credit & Debt</td>
+        <td>$-310.00</td>
+        <td>$-310.00</td>
+        <td class="positive">+0.00%</td>
+      </tr>
+      <tr>
+        <td>HS Travel Credit</td>
+        <td>Credit & Debt</td>
+        <td>$-7,357.00</td>
+        <td>$-7,357.00</td>
+        <td class="positive">+0.00%</td>
+      </tr>
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<script>
+const months = ["2026-09", "2026-10", "2026-11", "2026-12", "2027-01", "2027-02", "2027-03", "2027-04", "2027-05", "2027-06", "2027-07", "2027-08", "2027-09", "2027-10", "2027-11", "2027-12", "2028-01", "2028-02"];
+const datasets = [{"label": "Cash Wallet", "data": [30.0, 30.0, 30.0, 30.0, 30.0, 30.0, 30.0, 30.0, 30.0, 30.0, 30.0, 30.0, 30.0, 30.0, 30.0, 30.0, 30.0, 30.0], "borderColor": "#2ecc71", "backgroundColor": "#2ecc7133", "yAxisID": "pos", "tension": 0.3, "pointRadius": 3, "spanGaps": false}, {"label": "Octopus", "data": [59.0, 59.0, 59.0, 59.0, 59.0, 59.0, 59.0, 59.0, 59.0, 59.0, 59.0, 59.0, 59.0, 59.0, 59.0, 59.0, 59.0, 59.0], "borderColor": "#3498db", "backgroundColor": "#3498db33", "yAxisID": "pos", "tension": 0.3, "pointRadius": 3, "spanGaps": false}, {"label": "HSBC Savings", "data": [265126.09, 290887.24, 316722.35, 342631.63, 368615.29, 394673.55, 420806.62, 447014.71, 473298.04, 499656.83, 526091.3, 552601.65, 579188.12, 605850.91, 632590.24, 659406.35, 686299.43, 713269.73], "borderColor": "#e74c3c", "backgroundColor": "#e74c3c33", "yAxisID": "pos", "tension": 0.3, "pointRadius": 3, "spanGaps": false}, {"label": "CMWB Savings", "data": [12806.86, 12843.63, 12880.5, 12917.48, 12954.57, 12991.76, 13029.05, 13066.46, 13103.97, 13141.59, 13179.32, 13217.16, 13255.1, 13293.16, 13331.32, 13369.59, 13407.98, 13446.47], "borderColor": "#f39c12", "backgroundColor": "#f39c1233", "yAxisID": "pos", "tension": 0.3, "pointRadius": 3, "spanGaps": false}, {"label": "Longbridge Investment", "data": [160778.81, 161561.41, 162347.82, 163138.05, 163932.13, 164730.08, 165531.91, 166337.65, 167147.31, 167960.9, 168778.46, 169600.0, 170425.54, 171255.09, 172088.68, 172926.33, 173768.06, 174613.89], "borderColor": "#9b59b6", "backgroundColor": "#9b59b633", "yAxisID": "pos", "tension": 0.3, "pointRadius": 3, "spanGaps": false}, {"label": "Earnmore Credit", "data": [-310.0, -310.0, -310.0, -310.0, -310.0, -310.0, -310.0, -310.0, -310.0, -310.0, -310.0, -310.0, -310.0, -310.0, -310.0, -310.0, -310.0, -310.0], "borderColor": "#1abc9c", "backgroundColor": "#1abc9c33", "yAxisID": "neg", "tension": 0.3, "pointRadius": 3, "spanGaps": false}, {"label": "HS Travel Credit", "data": [-7357.0, -7357.0, -7357.0, -7357.0, -7357.0, -7357.0, -7357.0, -7357.0, -7357.0, -7357.0, -7357.0, -7357.0, -7357.0, -7357.0, -7357.0, -7357.0, -7357.0, -7357.0], "borderColor": "#e67e22", "backgroundColor": "#e67e2233", "yAxisID": "neg", "tension": 0.3, "pointRadius": 3, "spanGaps": false}];
+
+new Chart(document.getElementById('trendChart').getContext('2d'), {
+  type: 'line',
+  data: { labels: months, datasets: datasets },
+  options: {
+    responsive: true, maintainAspectRatio: false,
+    interaction: { mode: 'index', intersect: false },
+    scales: {
+      x: { title: { display: true, text: 'Month' }, grid: { color: '#ecf0f1' } },
+      pos: { position: 'left', title: { display: true, text: 'Asset Value (HKD)' }, grid: { color: '#ecf0f1' }, ticks: { callback: v => '$' + v.toLocaleString() } },
+      neg: { position: 'right', title: { display: true, text: 'Liability (HKD)' }, grid: { display: false }, ticks: { callback: v => '$' + v.toLocaleString() } }
+    },
+    plugins: {
+      legend: { position: 'bottom', labels: { usePointStyle: true, padding: 14, font: { size: 11 } } },
+      tooltip: { callbacks: { label: c => c.dataset.label + ': $' + (c.parsed.y == null ? 0 : c.parsed.y).toLocaleString() } }
+    }
+  }
+});
+
+const barColors = datasets.map(d => d.borderColor);
+new Chart(document.getElementById('barChart').getContext('2d'), {
+  type: 'bar',
+  data: { labels: datasets.map(d => d.label), datasets: [{
+    label: 'Forecast End Value (HKD)',
+    data: datasets.map(d => { const v = d.data.filter(x => x != null); return v.length ? v[v.length - 1] : 0; }),
+    backgroundColor: barColors,
+    borderRadius: 4
+  }] },
+  options: {
+    responsive: true, maintainAspectRatio: false,
+    indexAxis: 'y',
+    plugins: { legend: { display: false }, tooltip: { callbacks: { label: c => '$' + c.parsed.x.toLocaleString() } } },
+    scales: { x: { ticks: { callback: v => '$' + v.toLocaleString() } } }
+  }
+});
+
+new Chart(document.getElementById('pieChart').getContext('2d'), {
+  type: 'doughnut',
+  data: {
+    labels: ["Cash & Equivalents", "Savings Accounts", "Investments", "Credit & Debt"],
+    datasets: [{
+      data: [89.0, 726716.2, 174613.89, -7667.0],
+      backgroundColor: ["#f1c40f", "#3498db", "#2ecc71", "#c0392b"],
+      borderWidth: 2, borderColor: '#fff'
+    }]
+  },
+  options: {
+    responsive: true, maintainAspectRatio: false,
+    plugins: {
+      legend: { position: 'right', labels: { font: { size: 11 }, padding: 10 } },
+      tooltip: { callbacks: { label: c => c.label + ': $' + c.parsed.toLocaleString() } }
+    }
+  }
+});
+</script>
+</body>
+</html>

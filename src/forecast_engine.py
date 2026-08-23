@@ -65,9 +65,11 @@ def forecast_portfolio(
     forecast_months: int = 12,
     growth_overrides: Optional[Dict[str, float]] = None,
     contribution_overrides: Optional[Dict[str, float]] = None,
+    sow_contribution_overrides: Optional[Dict[str, float]] = None,
 ) -> Dict[str, Dict[str, float]]:
     growth_overrides = growth_overrides or {}
     contribution_overrides = contribution_overrides or {}
+    sow_contribution_overrides = sow_contribution_overrides or {}
 
     all_months: set = set()
     for sow in sow_list:
@@ -82,7 +84,11 @@ def forecast_portfolio(
     forecasted: Dict[str, Dict[str, float]] = {}
     for sow in sow_list:
         override_growth = growth_overrides.get(sow.sow_type)
-        override_contribution = contribution_overrides.get(sow.sow_type)
+
+        if sow.name in sow_contribution_overrides:
+            override_contribution = sow_contribution_overrides[sow.name]
+        else:
+            override_contribution = contribution_overrides.get(sow.sow_type)
 
         result = forecast_sow(
             sow=sow,
