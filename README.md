@@ -4,169 +4,125 @@ Personal wealth dashboard with forward-looking projections. See your net worth, 
 
 ## Highlights
 
-- **Unified net worth view** — Consolidate 9 asset classes (cash, savings, investments, retirement, real estate, crypto, personal property, income, credit) into a single, clear dashboard.
-- **Goal-aware projections** — 12-month deterministic forecasting shows whether you're on track for retirement, a home purchase, or other life milestones.
-- **User-controllable assumptions** — Adjust growth rates, inflation, and contribution plans to stress-test your financial future.
-- **Interactive visualizations** — Generate an HTML dashboard with trend lines, bar charts, and allocation pie charts to visualize your forecast at a glance.
-- **Per-SOW contribution targeting** — Allocate monthly contributions to specific assets (e.g., "HSBC Savings=25000") in addition to type-level overrides.
+- **Deterministic + Stochastic Forecasting** — Fixed-rate projection, Monte Carlo simulation (P5/P50/P95), linear trend extrapolation, and conservative/moderate/aggressive scenario analysis.
+- **Multi-user Database** — SQLite-backed per-user asset management with access control. Each user's data is isolated.
+- **Unified net worth view** — Consolidate 9 asset classes into a single dashboard.
+- **Interactive visualizations** — HTML dashboard with trend lines, bar charts, doughnut allocation, and stochastic confidence bands.
 
 ## Quick Start
 
-### 1. Install Dependencies
-
 ```bash
 pip install -r requirements.txt
+python3 src/main.py generate-sample          # Create sample Excel
+python3 src/main.py run --excel output/sample_wealth_data.xlsx --visualize
 ```
 
-### 2. Generate Sample Data
-
-Creates `output/sample_wealth_data.xlsx` with 11 SOWs across the system-defined types, spanning 12 months of historical data (2025-01 through 2025-12).
-
+## Start the Server
 ```bash
-python3 src/main.py generate-sample
+python3 src/web.py
 ```
 
-### 3. Run the Forecast Pipeline
-
-Reads the Excel, projects 12 months forward, and outputs a JSON report with forecasts, percentage breakdowns, and net worth growth.
+## Stochastic Forecasting
 
 ```bash
-python3 src/main.py run --excel output/sample_wealth_data.xlsx --forecast-months 12
-```
-
-### 4. View the Dashboard
-
-Add `--visualize` to generate an interactive HTML dashboard with Chart.js:
-
-```bash
-python3 src/main.py run --excel output/sample_wealth_data.xlsx --output output/forecast.json --visualize
-```
-
-This creates `output/forecast_dashboard.html`. Open it in any browser to see:
-- **KPI cards** — Start/End net worth, total growth %, monthly CAGR
-- **Trend line chart** — Each SOW asset as its own colored line (liabilities on a separate axis)
-- **Bar chart** — Forecast end values by SOW name
-- **Doughnut chart** — Asset allocation by type
-- **Detail table** — Per-SOW latest value, forecast end, and growth %
-
-Serve it locally:
-```bash
-cd output && python3 -m http.server 8000
-# then open http://localhost:8000/forecast_dashboard.html
-```
-
-> **Troubleshooting "Address already in use"**: If the port is occupied, kill the process first:
-> ```bash
-> lsof -ti:8000 | xargs kill -9
-> ```
-> Or use a different port: `python3 -m http.server 9000`
-
-### 5. Run Tests
-
-```bash
-python3 -m unittest test_pipeline -v
-```
-
-## Usage Examples
-
-```bash
-# Output results to a file
-python3 src/main.py run --excel output/sample_wealth_data.xlsx --output output/results.json
-
-# Override growth rates per SOW type
-python3 src/main.py run --excel output/sample_wealth_data.xlsx \
-    --growth investment=0.08,retirement=0.06,cash=0.05
-
-# Override monthly contributions per SOW type
-python3 src/main.py run --excel output/sample_wealth_data.xlsx \
-    --contribution investment=200,retirement=1500
-
-# Target contributions to specific SOWs by name
-python3 src/main.py run --excel output/my_assets.xlsx \
-    --sow-contribution "HSBC Savings=25000,Longbridge Investment=10000"
-
-# Combine all overrides with visualization
-python3 src/main.py run --excel output/my_assets.xlsx \
-    --growth savings=0.035,investment=0.045,credit=0.0 \
-    --sow-contribution "HSBC Savings=25000" \
-    --forecast-months 12 \
-    --output output/forecast.json \
+python3 src/main.py run \
+    --excel output/sample_wealth_data.xlsx \
+    --stochastic \
+    --min-growth investment=0.04,savings=0.02 \
+    --max-growth investment=0.10,savings=0.05 \
+    --monte-carlo-runs 500 \
     --visualize
-
-# Note: Monthly expenses (rent, credit card, etc.) are deducted from net
-# savings before allocating to assets. In the example above, $25,000 is
-# the net after income - rent ($7k) - expenses ($10k credit card).
-# If you do NOT pay off a credit card monthly, use a negative
-# --sow-contribution to model accumulating debt, e.g.:
-#   --sow-contribution "HS Travel Credit=-10000"
 ```
-
-## CLI Flags
 
 | Flag | Description |
 |------|-------------|
-| `--excel` | Path to the Excel file (required) |
-| `--forecast-months` | Number of months to forecast (default: 12) |
-| `--growth` | Growth rate overrides by type: `type=rate,type=rate` |
-| `--contribution` | Monthly contribution overrides by type: `type=amount,type=amount` |
-| `--sow-contribution` | Monthly contribution overrides by SOW name: `name=amount,name=amount` |
-| `--output` | Output path for JSON results (prints to stdout if omitted) |
-| `--visualize` | Generate `forecast_dashboard.html` with interactive charts |
+| `--stochastic` | Enable Monte Carlo + trend + scenario forecasting |
+| `--min-growth` | Min growth rate per SOW type: `type=rate` |
+| `--max-growth` | Max growth rate per SOW type: `type=rate` |
+| `--monte-carlo-runs` | Number of simulation runs (default: 500) |
+
+## Database Usage
+
+```bash
+# 1. Create a user
+python3 src/main.py user-create --username alice --email alice@example.com --password secret123
+
+# 2. Import Excel data into the user's account
+python3 src/main.py db-import --user-id 1 --excel output/sample_wealth_data.xlsx
+
+# 3. List, add, or delete assets
+python3 src/main.py asset-list --user-id 1
+python3 src/main.py asset-add --user-id 1 --name "Vanguard ETF" --sow-type investment
+python3 src/main.py mv-add --user-id 1 --asset-id 3 --month 2025-12 --value 35000
+
+# 4. Run forecast from database
+python3 src/main.py run-db --user-id 1 --stochastic --visualize
+```
+
+All data is stored per-user in `data/locus.db`. Each user can only access their own assets and monthly values.
+
+## CLI Flags
+
+### `run` / `run-db` command flags
+
+| Flag | Description |
+|------|-------------|
+| `--excel` | Path to Excel file (`run` only) |
+| `--user-id` | User ID to load data from (`run-db` only) |
+| `--forecast-months` | Months to forecast (default: 12) |
+| `--growth` | Growth overrides: `type=rate,type=rate` |
+| `--contribution` | Monthly contribution overrides: `type=amount` |
+| `--sow-contribution` | Per-SOW contribution: `name=amount,name=amount` |
+| `--min-growth` | Min growth for stochastic: `type=rate` |
+| `--max-growth` | Max growth for stochastic: `type=rate` |
+| `--stochastic` | Enable stochastic forecasting |
+| `--monte-carlo-runs` | Simulation count (default: 500) |
+| `--output` | Output JSON path (default: stdout) |
+| `--visualize` | Generate HTML dashboard |
+
+### Database command flags
+
+| Command | Flags | Description |
+|---------|-------|-------------|
+| `user-create` | `--username --email --password` | Create user account |
+| `user-list` | | List all users |
+| `db-import` | `--user-id --excel` | Import Excel into DB |
+| `asset-list` | `--user-id` | List user's assets |
+| `asset-add` | `--user-id --name --sow-type` | Add asset |
+| `asset-delete` | `--user-id --asset-id` | Delete asset |
+| `mv-add` | `--user-id --asset-id --month --value` | Add monthly value |
 
 ## Excel Format
 
-The Excel file must follow this structure:
+| SOW Name | SOW Type | 2025-01 | 2025-02 | ... |
+|----------|----------|---------|---------|-----|
+| Primary Salary | income | 8500 | 8700 | ... |
+| Index Fund | investment | 25000 | 26250 | ... |
 
-| SOW Name | SOW Type | 2025-01 | 2025-02 | 2025-03 | ... |
-|----------|----------|---------|---------|---------|-----|
-| Primary Salary | income | 8500 | 8700 | 8900 | ... |
-| Index Fund | investment | 25000 | 26250 | 27563 | ... |
-| Credit Card Balance | credit | -3500 | -3200 | -2900 | ... |
-
-- **SOW Name** (Column A): User-defined label for each source of wealth
-- **SOW Type** (Column B): System-defined category — must be one of the 9 types below
-- **Monthly Columns** (Columns C+): Each column is a month in `YYYY-MM` format; values are dollar amounts (use negative for debts)
-
-### System-Defined SOW Types
-
-| Type | Label | Asset? | Default Annual Growth |
-|------|-------|--------|----------------------|
-| `cash` | Cash & Equivalents | Yes | 0% |
-| `savings` | Savings Accounts | Yes | 3.5% |
-| `income` | Stable Income | Yes | 4% |
-| `investment` | Investments | Yes | 7% |
-| `retirement` | Retirement Accounts | Yes | 7% |
-| `real_estate` | Real Estate | Yes | 4% |
-| `crypto` | Crypto Assets | Yes | 10% |
-| `personal_property` | Personal Property | Yes | 2% |
-| `credit` | Credit & Debt | **No** (liability) | 5% |
+SOW Types: `cash`, `savings`, `income`, `investment`, `retirement`, `real_estate`, `crypto`, `personal_property`, `credit`
 
 ## Project Structure
 
 ```
 LocusAdvisory/
-├── src/                    # All source code
+├── src/
 │   ├── sow_types.py
 │   ├── excel_parser.py
-│   ├── forecast_engine.py
+│   ├── forecast_engine.py    # Deterministic + stochastic forecasting
 │   ├── breakdown.py
 │   ├── visualize.py
-│   ├── main.py             # CLI entry point
+│   ├── db.py                 # SQLite multi-user DB with access control
+│   ├── db_loader.py          # Bridge between DB and SOWData
+│   ├── main.py               # CLI entry point
 │   ├── generate_sample.py
-│   ├── generate_user_assets.py
 │   └── test_pipeline.py
-├── output/                 # All generated outputs
-│   ├── sample_wealth_data.xlsx
-│   ├── user_hkd_assets.xlsx
-│   ├── forecast_final.json
-│   └── forecast_dashboard.html
-├── requirements.txt
-├── prd.md
-└── README.md
+├── data/                     # SQLite database (auto-created)
+├── output/                   # Generated outputs
+└── requirements.txt
 ```
 
-## Target User
+## Tests
 
-- **Core**: Ages 28–42, household income $80K–$200K, multiple asset types — needs consolidation and retirement confidence.
-- **Secondary**: New homeowners, new parents, career changers — needs scenario planning for major life transitions.
-- **Future**: High-net-worth individuals — uses as a diagnostic tool alongside advisory relationships.
+```bash
+PYTHONPATH=src python3 -m unittest test_pipeline -v
+```

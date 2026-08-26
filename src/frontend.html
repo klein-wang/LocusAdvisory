@@ -1,0 +1,537 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>LocusAdvisory - Wealth Dashboard</title>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+<style>
+  :root {
+    --bg: #f5f6fa; --card: #ffffff; --text: #2c3e50; --muted: #7f8c8d;
+    --border: #ecf0f1; --accent: #3498db; --pos: #27ae60; --neg: #e74c3c;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: var(--bg); color: var(--text); }
+  .container { max-width: 1300px; margin: 0 auto; padding: 24px; }
+  .header { background: var(--card); border-radius: 12px; padding: 28px 32px; margin-bottom: 24px; box-shadow: 0 2px 12px rgba(0,0,0,0.06); display: flex; justify-content: space-between; align-items: center; }
+  .header h1 { font-size: 26px; }
+  .header .subtitle { color: var(--muted); font-size: 14px; margin-top: 4px; }
+  .card { background: var(--card); border-radius: 12px; padding: 24px 28px; margin-bottom: 24px; box-shadow: 0 2px 8px rgba(0,0,0,0.04); }
+  .card h2 { margin: 0 0 16px 0; font-size: 17px; }
+  .tabs { display: flex; gap: 8px; margin-bottom: 16px; flex-wrap: wrap; }
+  .tab { padding: 8px 16px; border-radius: 8px; cursor: pointer; background: #f0f2f5; font-size: 13px; font-weight: 500; border: none; }
+  .tab.active { background: var(--accent); color: #fff; }
+  .tab-content { display: none; }
+  .tab-content.active { display: block; }
+  .btn { padding: 10px 18px; border-radius: 8px; border: none; cursor: pointer; font-size: 14px; font-weight: 500; }
+  .btn-primary { background: var(--accent); color: #fff; }
+  .btn-danger { background: var(--neg); color: #fff; }
+  .btn-secondary { background: #95a5a6; color: #fff; }
+  .btn-sm { padding: 6px 12px; font-size: 12px; }
+  table { width: 100%; border-collapse: collapse; }
+  th, td { padding: 11px 14px; text-align: right; border-bottom: 1px solid var(--border); font-size: 13px; }
+  th:first-child, td:first-child { text-align: left; }
+  th { background: #f8f9fa; font-weight: 600; }
+  input, select { padding: 8px 12px; border: 1px solid var(--border); border-radius: 6px; font-size: 13px; width: 100%; }
+  .form-row { display: grid; grid-template-columns: 180px 1fr auto; gap: 12px; margin-bottom: 8px; align-items: center; }
+  .form-row label { font-size: 13px; color: var(--muted); }
+  .table-actions { display: flex; gap: 8px; }
+  .modal-overlay { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 1000; align-items: center; justify-content: center; }
+  .modal-overlay.active { display: flex; }
+  .modal { background: var(--card); border-radius: 12px; padding: 24px; max-width: 500px; width: 90%; }
+  .modal h3 { margin-bottom: 16px; }
+  .kpi-row { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 16px; margin-bottom: 24px; }
+  .kpi { background: var(--card); border-radius: 12px; padding: 20px; box-shadow: 0 2px 8px rgba(0,0,0,0.04); }
+  .kpi .label { font-size: 12px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.8px; margin-bottom: 6px; }
+  .kpi .value { font-size: 26px; font-weight: 700; }
+  .kpi .sub { font-size: 13px; color: var(--muted); margin-top: 2px; }
+  .chart-wrap { position: relative; height: 400px; }
+  .chart-row { display: grid; grid-template-columns: 1fr 350px; gap: 24px; margin-bottom: 24px; }
+  @media (max-width: 900px) { .chart-row { grid-template-columns: 1fr; } }
+  .hidden { display: none !important; }
+  .flash { padding: 12px 16px; border-radius: 8px; margin-bottom: 16px; font-size: 14px; }
+  .flash-success { background: #d4edda; color: #155724; }
+  .flash-error { background: #f8d7da; color: #721c24; }
+  .asset-row { cursor: pointer; }
+  .asset-row:hover { background: #f8f9fa; }
+  .mv-editor { padding: 16px; background: #f8f9fa; border-radius: 8px; margin-top: 8px; }
+  .mv-row { display: grid; grid-template-columns: 120px 1fr auto; gap: 8px; margin-bottom: 6px; align-items: center; }
+  .pos { color: var(--pos); }
+  .neg { color: var(--neg); }
+</style>
+</head>
+<body>
+<div class="container">
+  <div class="header">
+    <div>
+      <h1>LocusAdvisory - Wealth Dashboard</h1>
+      <div class="subtitle">Manage your assets, import data, and run forecasts</div>
+    </div>
+    <div>
+      <select id="userSelect" onchange="onUserChange()" style="width: 200px; display: inline-block;">
+        <option value="">-- Select User --</option>
+      </select>
+      <button class="btn btn-primary" onclick="showCreateUserModal()">+ New User</button>
+    </div>
+  </div>
+
+  <div id="flash"></div>
+
+  <div id="mainApp" class="hidden">
+    <div class="tabs">
+      <button class="tab active" onclick="switchTab(event, 'assets')">Assets</button>
+      <button class="tab" onclick="switchTab(event, 'forecast')">Forecast</button>
+      <button class="tab" onclick="switchTab(event, 'import')">Import Data</button>
+    </div>
+
+    <div id="assets" class="tab-content active">
+      <div class="card">
+        <h2>Asset Management</h2>
+        <button class="btn btn-primary" onclick="showAddAssetModal()" style="margin-bottom: 16px;">+ Add Asset</button>
+        <table id="assetTable">
+          <thead>
+            <tr>
+              <th>SOW Name</th>
+              <th>Type</th>
+              <th>Latest Month</th>
+              <th>Latest Value</th>
+              <th>Actions</th>
+            </tr>
+          </thead>
+          <tbody id="assetTableBody"></tbody>
+        </table>
+      </div>
+    </div>
+
+    <div id="forecast" class="tab-content">
+      <div class="card">
+        <h2>Run Forecast</h2>
+        <div class="form-row">
+          <label>Forecast Months</label>
+          <input type="number" id="forecastMonths" value="12" min="1" max="60">
+          <button class="btn btn-primary" onclick="runForecast()">Run Forecast</button>
+        </div>
+        <div class="form-row">
+          <label>Stochastic</label>
+          <input type="checkbox" id="stochastic" checked style="width: auto;">
+          <span></span>
+        </div>
+        <div class="form-row">
+          <label>Monte Carlo Runs</label>
+          <input type="number" id="mcRuns" value="500" min="100" max="5000">
+          <span></span>
+        </div>
+        <div class="form-row">
+          <label>Contribution Overrides</label>
+          <input id="contribOverride" placeholder="e.g. savings=20000,investment=500">
+          <span></span>
+        </div>
+        <div class="form-row">
+          <label>Growth Overrides</label>
+          <input id="growthOverride" placeholder="e.g. savings=0.035,investment=0.07">
+          <span></span>
+        </div>
+      </div>
+      <div id="forecastResults" class="hidden">
+        <div class="kpi-row" id="kpiRow"></div>
+        <div class="chart-row">
+          <div class="card">
+            <h2>Forecast Trend</h2>
+            <div class="chart-wrap"><canvas id="forecastChart"></canvas></div>
+          </div>
+          <div class="card">
+            <h2>Allocation</h2>
+            <div class="chart-wrap"><canvas id="pieChart"></canvas></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div id="import" class="tab-content">
+      <div class="card">
+        <h2>Import Data</h2>
+        <p style="color: var(--muted); margin-bottom: 16px;">Import Excel (.xlsx) files or load the sample HKD assets.</p>
+        <button class="btn btn-primary" onclick="importSample()" style="margin-bottom: 16px;">Import Sample HKD Assets</button>
+        <div style="border-top: 1px solid var(--border); padding-top: 16px;">
+          <h3 style="margin-bottom: 12px; font-size: 15px;">Upload Custom Excel</h3>
+          <input type="file" id="excelFile" accept=".xlsx" style="margin-bottom: 12px;">
+          <button class="btn btn-primary" onclick="uploadExcel()">Upload</button>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div id="createUserModal" class="modal-overlay">
+  <div class="modal">
+    <h3>Create New User</h3>
+    <div class="form-row"><label>Username</label><input id="newUsername"><span></span></div>
+    <div class="form-row"><label>Email</label><input id="newEmail"><span></span></div>
+    <div class="form-row"><label>Password</label><input id="newPassword" type="password"><span></span></div>
+    <div style="display: flex; gap: 8px; justify-content: flex-end; margin-top: 16px;">
+      <button class="btn btn-secondary" onclick="hideModal('createUserModal')">Cancel</button>
+      <button class="btn btn-primary" onclick="createUser()">Create</button>
+    </div>
+  </div>
+</div>
+
+<div id="addAssetModal" class="modal-overlay">
+  <div class="modal">
+    <h3>Add Asset</h3>
+    <div class="form-row"><label>SOW Name</label><input id="newAssetName"><span></span></div>
+    <div class="form-row"><label>SOW Type</label><select id="newAssetType"></select><span></span></div>
+    <div style="display: flex; gap: 8px; justify-content: flex-end; margin-top: 16px;">
+      <button class="btn btn-secondary" onclick="hideModal('addAssetModal')">Cancel</button>
+      <button class="btn btn-primary" onclick="addAsset()">Add</button>
+    </div>
+  </div>
+</div>
+
+<div id="editAssetModal" class="modal-overlay">
+  <div class="modal">
+    <h3>Edit Asset</h3>
+    <div class="form-row"><label>SOW Name</label><input id="editAssetName"><span></span></div>
+    <div class="form-row"><label>SOW Type</label><select id="editAssetType"></select><span></span></div>
+    <div style="display: flex; gap: 8px; justify-content: flex-end; margin-top: 16px;">
+      <button class="btn btn-secondary" onclick="hideModal('editAssetModal')">Cancel</button>
+      <button class="btn btn-primary" onclick="saveAsset()">Save</button>
+    </div>
+  </div>
+</div>
+
+<script>
+let currentUserId = null;
+let editingAssetId = null;
+let charts = {};
+
+async function api(method, path, data) {
+  const opts = { method, headers: { 'Content-Type': 'application/json' } };
+  if (data) opts.body = JSON.stringify(data);
+  const res = await fetch(path, opts);
+  const json = await res.json();
+  if (!res.ok) throw new Error(json.error || 'Request failed');
+  return json;
+}
+
+async function apiForm(method, path, formData) {
+  const opts = { method, body: formData };
+  const res = await fetch(path, opts);
+  const json = await res.json();
+  if (!res.ok) throw new Error(json.error || 'Request failed');
+  return json;
+}
+
+function showFlash(msg, type) {
+  const el = document.getElementById('flash');
+  el.innerHTML = '<div class="flash flash-' + (type || 'success') + '">' + msg + '</div>';
+  setTimeout(function() { el.innerHTML = ''; }, 4000);
+}
+
+function switchTab(e, tabId) {
+  document.querySelectorAll('.tab').forEach(function(t) { t.classList.remove('active'); });
+  document.querySelectorAll('.tab-content').forEach(function(c) { c.classList.remove('active'); });
+  e.target.classList.add('active');
+  document.getElementById(tabId).classList.add('active');
+}
+
+function showModal(id) { document.getElementById(id).classList.add('active'); }
+function hideModal(id) { document.getElementById(id).classList.remove('active'); }
+
+function showCreateUserModal() { showModal('createUserModal'); }
+
+function showAddAssetModal() {
+  if (!currentUserId) { showFlash('Please select a user first', 'error'); return; }
+  populateSowTypes('newAssetType');
+  document.getElementById('newAssetName').value = '';
+  showModal('addAssetModal');
+}
+
+async function populateSowTypes(selectId) {
+  const types = await api('GET', '/api/sow-types');
+  const sel = document.getElementById(selectId);
+  sel.innerHTML = types.map(function(t) { return '<option value="' + t.key + '">' + t.label + '</option>'; }).join('');
+}
+
+async function loadUsers() {
+  try {
+    const users = await api('GET', '/api/users');
+    const sel = document.getElementById('userSelect');
+    sel.innerHTML = '<option value="">-- Select User --</option>' +
+      users.map(function(u) { return '<option value="' + u.id + '">' + u.username + ' (' + u.email + ')</option>'; }).join('');
+    if (users.length > 0 && !currentUserId) {
+      currentUserId = users[0].id;
+      sel.value = currentUserId;
+      onUserChange();
+    }
+  } catch (e) { console.error(e); }
+}
+
+function onUserChange() {
+  currentUserId = parseInt(document.getElementById('userSelect').value) || null;
+  if (currentUserId) {
+    document.getElementById('mainApp').classList.remove('hidden');
+    loadAssets();
+  } else {
+    document.getElementById('mainApp').classList.add('hidden');
+  }
+}
+
+async function createUser() {
+  const username = document.getElementById('newUsername').value.trim();
+  const email = document.getElementById('newEmail').value.trim();
+  const password = document.getElementById('newPassword').value;
+  try {
+    const user = await api('POST', '/api/users', { username: username, email: email, password: password });
+    hideModal('createUserModal');
+    showFlash('User created: ' + user.username);
+    loadUsers();
+    document.getElementById('userSelect').value = user.id;
+    onUserChange();
+  } catch (e) { showFlash(e.message, 'error'); }
+}
+
+async function loadAssets() {
+  if (!currentUserId) return;
+  try {
+    const assets = await api('GET', '/api/assets?user_id=' + currentUserId);
+    const tbody = document.getElementById('assetTableBody');
+    tbody.innerHTML = '';
+    if (assets.length === 0) {
+      tbody.innerHTML = '<tr><td colspan="5" style="text-align:center; color: var(--muted);">No assets yet. Add one or import data.</td></tr>';
+      return;
+    }
+    for (const a of assets) {
+      const latestVal = a.latest_value ? '$' + a.latest_value.toLocaleString(undefined, {maximumFractionDigits: 2}) : '-';
+      const row = document.createElement('tr');
+      row.innerHTML = '<td>' + a.name + '</td><td>' + a.sow_type + '</td><td>' + (a.latest_month || '-') + '</td><td>' + latestVal + '</td><td><div class="table-actions"><button class="btn btn-secondary btn-sm" onclick="editAsset(' + a.id + ')">Edit</button><button class="btn btn-danger btn-sm" onclick="deleteAsset(' + a.id + ')">Delete</button></div></td>';
+      tbody.appendChild(row);
+
+      const mvs = a.monthly_values || {};
+      const mvKeys = Object.keys(mvs).sort();
+      let mvHtml = '';
+      if (mvKeys.length === 0) {
+        mvHtml = '<div style="color:var(--muted);font-size:12px;">No monthly values yet.</div>';
+      } else {
+        for (const m of mvKeys) {
+          mvHtml += '<div class="mv-row"><span>' + m + '</span><span>$' + mvs[m].toLocaleString(undefined, {maximumFractionDigits: 2}) + '</span><button class="btn btn-danger btn-sm" onclick="deleteMV(' + a.id + ',\'' + m + '\')">X</button></div>';
+        }
+      }
+      mvHtml += '<div class="mv-row" style="margin-top:8px;"><input id="mvMonth_' + a.id + '" placeholder="YYYY-MM" style="width:120px;"><input id="mvValue_' + a.id + '" type="number" placeholder="Value" style="flex:1;"><button class="btn btn-primary btn-sm" onclick="addMV(' + a.id + ')">Add</button></div>';
+
+      const mvTr = document.createElement('tr');
+      mvTr.innerHTML = '<td colspan="5"><div class="mv-editor"><strong>Monthly Values</strong><div style="margin-top:8px;">' + mvHtml + '</div></div></td>';
+      tbody.appendChild(mvTr);
+    }
+  } catch (e) { showFlash(e.message, 'error'); }
+}
+
+async function addAsset() {
+  const name = document.getElementById('newAssetName').value.trim();
+  const type = document.getElementById('newAssetType').value;
+  try {
+    await api('POST', '/api/assets', { user_id: currentUserId, name: name, sow_type: type });
+    hideModal('addAssetModal');
+    showFlash('Asset added');
+    loadAssets();
+  } catch (e) { showFlash(e.message, 'error'); }
+}
+
+function editAsset(id) {
+  const rows = document.querySelectorAll('#assetTableBody tr');
+  let name = '', type = '';
+  for (let i = 0; i < rows.length; i++) {
+    if (rows[i].querySelector('.btn-sm')) {
+      const onclick = rows[i].querySelector('.btn-sm').getAttribute('onclick') || '';
+      if (onclick.indexOf('editAsset(' + id + ')') !== -1) {
+        name = rows[i].cells[0].textContent;
+        type = rows[i].cells[1].textContent;
+        break;
+      }
+    }
+  }
+  editingAssetId = id;
+  document.getElementById('editAssetName').value = name;
+  populateSowTypes('editAssetType').then(function() {
+    const sel = document.getElementById('editAssetType');
+    for (let i = 0; i < sel.options.length; i++) {
+      if (sel.options[i].value === type) { sel.selectedIndex = i; break; }
+    }
+  });
+  showModal('editAssetModal');
+}
+
+async function saveAsset() {
+  const name = document.getElementById('editAssetName').value.trim();
+  const type = document.getElementById('editAssetType').value;
+  try {
+    await api('PUT', '/api/assets/' + editingAssetId, { user_id: currentUserId, name: name, sow_type: type });
+    hideModal('editAssetModal');
+    showFlash('Asset updated');
+    loadAssets();
+  } catch (e) { showFlash(e.message, 'error'); }
+}
+
+async function deleteAsset(id) {
+  if (!confirm('Delete this asset and all its monthly values?')) return;
+  try {
+    await api('DELETE', '/api/assets/' + id + '?user_id=' + currentUserId);
+    showFlash('Asset deleted');
+    loadAssets();
+  } catch (e) { showFlash(e.message, 'error'); }
+}
+
+async function addMV(assetId) {
+  const month = document.getElementById('mvMonth_' + assetId).value.trim();
+  const value = document.getElementById('mvValue_' + assetId).value;
+  if (!month || value === '') { showFlash('Both month and value required', 'error'); return; }
+  try {
+    await api('POST', '/api/assets/' + assetId + '/mv', { user_id: currentUserId, month: month, value: parseFloat(value) });
+    showFlash('Monthly value added');
+    loadAssets();
+  } catch (e) { showFlash(e.message, 'error'); }
+}
+
+async function deleteMV(assetId, month) {
+  if (!confirm('Delete value for ' + month + '?')) return;
+  try {
+    await api('DELETE', '/api/assets/' + assetId + '/mv/' + month + '?user_id=' + currentUserId);
+    showFlash('Monthly value deleted');
+    loadAssets();
+  } catch (e) { showFlash(e.message, 'error'); }
+}
+
+async function importSample() {
+  try {
+    const result = await api('POST', '/api/import-sample', { user_id: currentUserId });
+    showFlash('Imported ' + result.count + ' assets');
+    loadAssets();
+  } catch (e) { showFlash(e.message, 'error'); }
+}
+
+async function uploadExcel() {
+  const fileInput = document.getElementById('excelFile');
+  if (!fileInput.files[0]) { showFlash('Please select a file', 'error'); return; }
+  const fd = new FormData();
+  fd.append('user_id', currentUserId);
+  fd.append('file', fileInput.files[0]);
+  try {
+    const result = await apiForm('POST', '/api/import', fd);
+    showFlash('Imported ' + result.count + ' assets');
+    loadAssets();
+  } catch (e) { showFlash(e.message, 'error'); }
+}
+
+async function runForecast() {
+  if (!currentUserId) return;
+  const months = parseInt(document.getElementById('forecastMonths').value) || 12;
+  const stochastic = document.getElementById('stochastic').checked;
+  const mcRuns = parseInt(document.getElementById('mcRuns').value) || 500;
+
+  const contribStr = document.getElementById('contribOverride').value.trim();
+  const growthStr = document.getElementById('growthOverride').value.trim();
+  const contribOverrides = {};
+  const growthOverrides = {};
+  if (contribStr) {
+    contribStr.split(',').forEach(function(p) {
+      const parts = p.split('=');
+      if (parts.length === 2) contribOverrides[parts[0].trim()] = parseFloat(parts[1]);
+    });
+  }
+  if (growthStr) {
+    growthStr.split(',').forEach(function(p) {
+      const parts = p.split('=');
+      if (parts.length === 2) growthOverrides[parts[0].trim()] = parseFloat(parts[1]);
+    });
+  }
+
+  try {
+    showFlash('Running forecast...');
+    const result = await api('POST', '/api/forecast', {
+      user_id: currentUserId,
+      forecast_months: months,
+      stochastic: stochastic,
+      monte_carlo_runs: mcRuns,
+      growth_overrides: growthOverrides,
+      min_growth_overrides: {},
+      max_growth_overrides: {},
+      contribution_overrides: contribOverrides,
+      sow_contribution_overrides: {},
+    });
+    showFlash('Forecast complete');
+    renderForecast(result);
+  } catch (e) { showFlash(e.message, 'error'); }
+}
+
+function renderForecast(result) {
+  document.getElementById('forecastResults').classList.remove('hidden');
+  const growth = result.net_worth_growth || {};
+  const kpiRow = document.getElementById('kpiRow');
+  const growthPct = growth.total_growth_pct || 0;
+  const pctClass = growthPct >= 0 ? 'pos' : 'neg';
+  kpiRow.innerHTML =
+    '<div class="kpi"><div class="label">Start Net Worth</div><div class="value">$' + (growth.start_net_worth || 0).toLocaleString(undefined, {maximumFractionDigits: 0}) + '</div><div class="sub">' + (growth.start_month || '') + '</div></div>' +
+    '<div class="kpi"><div class="label">End Net Worth</div><div class="value">$' + (growth.end_net_worth || 0).toLocaleString(undefined, {maximumFractionDigits: 0}) + '</div><div class="sub">' + (growth.end_month || '') + '</div></div>' +
+    '<div class="kpi"><div class="label">Total Growth</div><div class="value ' + pctClass + '">' + growthPct.toFixed(2) + '%</div><div class="sub">Projected change</div></div>' +
+    '<div class="kpi"><div class="label">Forecast Months</div><div class="value">' + (result.forecast_months || []).length + '</div><div class="sub">Monthly projections</div></div>';
+
+  const ctx = document.getElementById('forecastChart').getContext('2d');
+  if (charts.trend) charts.trend.destroy();
+  const colors = ['#3498db','#2ecc71','#e67e22','#9b59b6','#e74c3c','#1abc9c','#f1c40f','#2980b9','#c0392b'];
+  let ci = 0;
+  const labels = result.forecast_months || [];
+  const datasets = [];
+  let combinedLabels = [];
+
+  if (result.forecasts) {
+    const fmonths = result.forecast_months || [];
+    for (const [name, fc] of Object.entries(result.forecasts)) {
+      const hist = (result.sow_summaries || []).find(function(s) { return s.name === name; });
+      const histMonth = hist ? hist.latest_historical_month : null;
+      const histVal = hist ? hist.latest_historical_value : null;
+      const fcArr = fmonths.map(function(m) { return fc[m] ?? 0; });
+      const data = histMonth ? [histVal].concat(fcArr) : fcArr;
+      if (ci === 0) {
+        combinedLabels = histMonth ? [histMonth].concat(labels) : labels;
+      }
+      datasets.push({
+        label: name,
+        data: data,
+        borderColor: colors[ci % colors.length],
+        backgroundColor: colors[ci % colors.length] + '33',
+        tension: 0.3,
+        pointRadius: 2,
+        spanGaps: false,
+        borderWidth: 2,
+      });
+      ci++;
+    }
+    charts.trend = new Chart(ctx, {
+      type: 'line',
+      data: { labels: combinedLabels, datasets: datasets },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        interaction: { mode: 'index', intersect: false },
+        scales: { y: { ticks: { callback: function(v) { return '$' + (v || 0).toLocaleString(); } } } },
+        plugins: { legend: { position: 'bottom', labels: { pointStyle: 'circle', usePointStyle: true } } }
+      }
+    });
+  }
+
+  const pieCtx = document.getElementById('pieChart').getContext('2d');
+  if (charts.pie) charts.pie.destroy();
+  if (result.type_summary) {
+    const pieLabels = Object.values(result.type_summary).map(function(t) { return t.label; });
+    const pieValues = Object.values(result.type_summary).map(function(t) { return t.forecast_end_value; });
+    charts.pie = new Chart(pieCtx, {
+      type: 'doughnut',
+      data: { labels: pieLabels, datasets: [{ data: pieValues, backgroundColor: colors.slice(0, pieLabels.length), borderWidth: 2, borderColor: '#fff' }] },
+      options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'right' } } }
+    });
+  }
+}
+
+loadUsers();
+</script>
+</body>
+</html>
