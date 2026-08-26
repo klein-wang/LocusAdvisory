@@ -133,7 +133,7 @@ def api_forecast():
         min_growth_overrides=d.get('min_growth_overrides', {}),
         max_growth_overrides=d.get('max_growth_overrides', {}),
         contribution_overrides=d.get('contribution_overrides', {}),
-        sow_contribution_overrides=d.get('sow_contribution_overrides', {}),
+        sow_contribution_overrides=d.get('sow_contribution_overrides', {}), # {"CMWB": 0.0}
     )
     return jsonify(result)
 

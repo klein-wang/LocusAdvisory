@@ -127,6 +127,11 @@
           <span></span>
         </div>
         <div class="form-row">
+          <label>SOW Contribution Overrides</label>
+          <input id="sowContribOverride" placeholder="e.g. CMWB Savings=0,HSBC Savings=20000">
+          <span></span>
+        </div>
+        <div class="form-row">
           <label>Growth Overrides</label>
           <input id="growthOverride" placeholder="e.g. savings=0.035,investment=0.07">
           <span></span>
@@ -428,13 +433,25 @@ async function runForecast() {
   const mcRuns = parseInt(document.getElementById('mcRuns').value) || 500;
 
   const contribStr = document.getElementById('contribOverride').value.trim();
+  const sowContribStr = document.getElementById('sowContribOverride').value.trim();
   const growthStr = document.getElementById('growthOverride').value.trim();
   const contribOverrides = {};
+  const sowContribOverrides = {};
   const growthOverrides = {};
   if (contribStr) {
     contribStr.split(',').forEach(function(p) {
       const parts = p.split('=');
       if (parts.length === 2) contribOverrides[parts[0].trim()] = parseFloat(parts[1]);
+    });
+  }
+  if (sowContribStr) {
+    sowContribStr.split(',').forEach(function(p) {
+      const idx = p.indexOf('=');
+      if (idx > 0) {
+        const name = p.substring(0, idx).trim();
+        const val = parseFloat(p.substring(idx + 1).trim());
+        if (name && !isNaN(val)) sowContribOverrides[name] = val;
+      }
     });
   }
   if (growthStr) {
@@ -455,7 +472,7 @@ async function runForecast() {
       min_growth_overrides: {},
       max_growth_overrides: {},
       contribution_overrides: contribOverrides,
-      sow_contribution_overrides: {},
+      sow_contribution_overrides: sowContribOverrides,
     });
     showFlash('Forecast complete');
     renderForecast(result);
