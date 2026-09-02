@@ -3,6 +3,7 @@ __pycache__/
 *.pyo
 sample_wealth_data.xlsx
 *.xlsx
+!src/sample_data/*.xlsx
 .venv/
 venv/
 .env

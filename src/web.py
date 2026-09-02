@@ -16,7 +16,8 @@ CORS(app, supports_credentials=True, resources={r"/api/*": {
 }})
 
 db = Database()
-ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+APP_DIR = os.path.dirname(os.path.abspath(__file__))
+ROOT = os.path.dirname(APP_DIR)
 
 def login_required(f):
     @wraps(f)
@@ -216,7 +217,7 @@ def api_import():
 @login_required
 def api_import_sample():
     uid = session["user_id"]
-    sp = os.path.join(ROOT, 'output', 'user_hkd_assets.xlsx')
+    sp = os.path.join(APP_DIR, 'sample_data', 'sample_assets.xlsx')
     if not os.path.exists(sp):
         return jsonify({'error': 'Sample not found'}), 404
     try:
