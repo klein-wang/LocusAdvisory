@@ -86,6 +86,18 @@ class Database:
                 CREATE INDEX IF NOT EXISTS idx_assets_user_id ON assets(user_id);
                 CREATE INDEX IF NOT EXISTS idx_monthly_values_asset_id ON monthly_values(asset_id);
                 CREATE INDEX IF NOT EXISTS idx_forecast_configs_user_id ON forecast_configs(user_id);
+
+                CREATE TABLE IF NOT EXISTS user_sow_overrides (
+                    user_id INTEGER NOT NULL,
+                    sow_type TEXT NOT NULL,
+                    annual_growth REAL,
+                    monthly_contribution REAL,
+                    min_growth REAL,
+                    max_growth REAL,
+                    updated_at TEXT NOT NULL,
+                    PRIMARY KEY (user_id, sow_type),
+                    FOREIGN KEY (user_id) REFERENCES users(id)
+                );
             """)
 
     @staticmethod
@@ -299,12 +311,61 @@ class Database:
                 self.batch_set_monthly_values(user_id, asset_id, sow.monthly_values)
                 imported += 1
             except sqlite3.IntegrityError:
-                existing = conn.execute(
-                    "SELECT id FROM assets WHERE user_id = ? AND name = ?",
-                    (user_id, sow.name),
-                ).fetchone()
+                with self._connect() as conn:
+                    existing = conn.execute(
+                        "SELECT id FROM assets WHERE user_id = ? AND name = ?",
+                        (user_id, sow.name),
+                    ).fetchone()
                 if existing:
                     self.batch_set_monthly_values(user_id, existing["id"], sow.monthly_values)
                     imported += 1
-
         return imported
+
+    def get_user_sow_overrides(self, user_id: int) -> dict:
+        with self._connect() as conn:
+            rows = conn.execute(
+                "SELECT sow_type, annual_growth, monthly_contribution, min_growth, max_growth "
+                "FROM user_sow_overrides WHERE user_id = ?",
+                (user_id,),
+            ).fetchall()
+        return {
+            r["sow_type"]: {
+                "annual_growth": r["annual_growth"],
+                "monthly_contribution": r["monthly_contribution"],
+                "min_growth": r["min_growth"],
+                "max_growth": r["max_growth"],
+            }
+            for r in rows
+        }
+
+    def set_user_sow_overrides(self, user_id: int, overrides: dict) -> None:
+        now = datetime.now().isoformat()
+        with self._connect() as conn:
+            for sow_type, fields in overrides.items():
+                conn.execute(
+                    "INSERT INTO user_sow_overrides "
+                    "(user_id, sow_type, annual_growth, monthly_contribution, min_growth, max_growth, updated_at) "
+                    "VALUES (?, ?, ?, ?, ?, ?, ?) "
+                    "ON CONFLICT(user_id, sow_type) DO UPDATE SET "
+                    "annual_growth=excluded.annual_growth, "
+                    "monthly_contribution=excluded.monthly_contribution, "
+                    "min_growth=excluded.min_growth, "
+                    "max_growth=excluded.max_growth, "
+                    "updated_at=excluded.updated_at",
+                    (
+                        user_id,
+                        sow_type,
+                        fields.get("annual_growth"),
+                        fields.get("monthly_contribution"),
+                        fields.get("min_growth"),
+                        fields.get("max_growth"),
+                        now,
+                    ),
+                )
+
+    def delete_user_sow_override(self, user_id: int, sow_type: str) -> None:
+        with self._connect() as conn:
+            conn.execute(
+                "DELETE FROM user_sow_overrides WHERE user_id = ? AND sow_type = ?",
+                (user_id, sow_type),
+            )
