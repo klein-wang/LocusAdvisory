@@ -1,6 +1,7 @@
 import json, os, sys, tempfile
-from flask import Flask, request, jsonify
+from flask import Flask, request, jsonify, session, redirect
 from flask_cors import CORS
+from functools import wraps
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from db import Database
 from db_loader import load_user_sow_data
@@ -8,18 +9,67 @@ from main import run_pipeline_from_sow_list
 from sow_types import SOW_TYPES
 
 app = Flask(__name__)
-CORS(app)
+app.secret_key = os.environ.get("SECRET_KEY", "dev-secret-change-in-production")
+
+CORS(app, supports_credentials=True, resources={r"/api/*": {
+    "origins": os.environ.get("CORS_ORIGINS", "*"),
+}})
+
 db = Database()
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+
+def login_required(f):
+    @wraps(f)
+    def decorated(*args, **kwargs):
+        user_id = session.get("user_id")
+        if not user_id:
+            return jsonify({"error": "Authentication required"}), 401
+        return f(*args, **kwargs)
+    return decorated
+
 
 @app.route('/')
 def index():
     with open(os.path.join(ROOT, 'src', 'frontend.html')) as f:
         return f.read()
 
+
+@app.route('/api/me', methods=['GET'])
+def api_me():
+    user_id = session.get("user_id")
+    if user_id:
+        user = db.get_user(user_id)
+        if user:
+            return jsonify(user)
+    return jsonify({"error": "Not authenticated"}), 401
+
+
+@app.route('/api/login', methods=['POST'])
+def api_login():
+    d = request.get_json()
+    u = (d.get('username') or '').strip()
+    p = d.get('password') or ''
+    if not u or not p:
+        return jsonify({'error': 'Username and password required'}), 400
+    user = db.authenticate_user(u, p)
+    if user:
+        session["user_id"] = user["id"]
+        session.permanent = True
+        return jsonify(user)
+    return jsonify({'error': 'Invalid credentials'}), 401
+
+
+@app.route('/api/logout', methods=['POST'])
+def api_logout():
+    session.clear()
+    return jsonify({'ok': True})
+
+
 @app.route('/api/users', methods=['GET'])
+@login_required
 def api_users():
     return jsonify(db.list_users())
+
 
 @app.route('/api/users', methods=['POST'])
 def api_create_user():
@@ -31,15 +81,17 @@ def api_create_user():
         return jsonify({'error': 'All fields required'}), 400
     try:
         uid = db.create_user(u, e, p)
+        user = db.get_user(uid)
+        session["user_id"] = uid
         return jsonify({'id': uid, 'username': u, 'email': e})
     except Exception as ex:
         return jsonify({'error': str(ex)}), 400
 
+
 @app.route('/api/assets', methods=['GET'])
+@login_required
 def api_assets():
-    uid = request.args.get('user_id', type=int)
-    if not uid:
-        return jsonify({'error': 'user_id required'}), 400
+    uid = session["user_id"]
     assets = db.list_assets(uid)
     for a in assets:
         vals = db.get_asset_monthly_values(uid, a['id'])
@@ -48,13 +100,15 @@ def api_assets():
         a['latest_value'] = vals.get(a['latest_month'], 0) if a['latest_month'] else 0
     return jsonify(assets)
 
+
 @app.route('/api/assets', methods=['POST'])
+@login_required
 def api_add_asset():
     d = request.get_json()
-    uid = d.get('user_id')
+    uid = session["user_id"]
     name = (d.get('name') or '').strip()
     st = (d.get('sow_type') or '').strip()
-    if not uid or not name or not st:
+    if not name or not st:
         return jsonify({'error': 'Fields required'}), 400
     if st not in SOW_TYPES:
         return jsonify({'error': 'Invalid type: ' + st}), 400
@@ -64,12 +118,12 @@ def api_add_asset():
     except Exception as ex:
         return jsonify({'error': str(ex)}), 400
 
+
 @app.route('/api/assets/<int:aid>', methods=['PUT'])
+@login_required
 def api_update_asset(aid):
+    uid = session["user_id"]
     d = request.get_json()
-    uid = d.get('user_id')
-    if not uid:
-        return jsonify({'error': 'user_id required'}), 400
     n = (d.get('name') or '').strip() or None
     st = (d.get('sow_type') or '').strip() or None
     try:
@@ -78,28 +132,30 @@ def api_update_asset(aid):
     except Exception as ex:
         return jsonify({'error': str(ex)}), 400
 
+
 @app.route('/api/assets/<int:aid>', methods=['DELETE'])
+@login_required
 def api_delete_asset(aid):
-    uid = request.args.get('user_id', type=int)
-    if not uid:
-        return jsonify({'error': 'user_id required'}), 400
+    uid = session["user_id"]
     db.delete_asset(uid, aid)
     return jsonify({'ok': True})
 
+
 @app.route('/api/assets/<int:aid>/mv', methods=['GET'])
+@login_required
 def api_get_mv(aid):
-    uid = request.args.get('user_id', type=int)
-    if not uid:
-        return jsonify({'error': 'user_id required'}), 400
+    uid = session["user_id"]
     return jsonify({'monthly_values': db.get_asset_monthly_values(uid, aid)})
 
+
 @app.route('/api/assets/<int:aid>/mv', methods=['POST'])
+@login_required
 def api_set_mv(aid):
     d = request.get_json()
-    uid = d.get('user_id')
+    uid = session["user_id"]
     m = (d.get('month') or '').strip()
     v = d.get('value')
-    if not uid or not m or v is None:
+    if not m or v is None:
         return jsonify({'error': 'Fields required'}), 400
     try:
         db.set_monthly_value(uid, aid, m, float(v))
@@ -107,20 +163,20 @@ def api_set_mv(aid):
     except Exception:
         return jsonify({'error': 'Invalid value'}), 400
 
+
 @app.route('/api/assets/<int:aid>/mv/<month>', methods=['DELETE'])
+@login_required
 def api_del_mv(aid, month):
-    uid = request.args.get('user_id', type=int)
-    if not uid:
-        return jsonify({'error': 'user_id required'}), 400
+    uid = session["user_id"]
     db.delete_monthly_value(uid, aid, month)
     return jsonify({'ok': True})
 
+
 @app.route('/api/forecast', methods=['POST'])
+@login_required
 def api_forecast():
     d = request.get_json()
-    uid = d.get('user_id')
-    if not uid:
-        return jsonify({'error': 'user_id required'}), 400
+    uid = session["user_id"]
     sow_list = load_user_sow_data(db, uid)
     if not sow_list:
         return jsonify({'error': 'No assets'}), 400
@@ -133,15 +189,15 @@ def api_forecast():
         min_growth_overrides=d.get('min_growth_overrides', {}),
         max_growth_overrides=d.get('max_growth_overrides', {}),
         contribution_overrides=d.get('contribution_overrides', {}),
-        sow_contribution_overrides=d.get('sow_contribution_overrides', {}), # {"CMWB": 0.0}
+        sow_contribution_overrides=d.get('sow_contribution_overrides', {}),
     )
     return jsonify(result)
 
+
 @app.route('/api/import', methods=['POST'])
+@login_required
 def api_import():
-    uid = request.form.get('user_id', type=int)
-    if not uid:
-        return jsonify({'error': 'user_id required'}), 400
+    uid = session["user_id"]
     f = request.files.get('file')
     if not f:
         return jsonify({'error': 'No file'}), 400
@@ -155,12 +211,11 @@ def api_import():
         finally:
             os.unlink(tmp.name)
 
+
 @app.route('/api/import-sample', methods=['POST'])
+@login_required
 def api_import_sample():
-    d = request.get_json()
-    uid = d.get('user_id')
-    if not uid:
-        return jsonify({'error': 'user_id required'}), 400
+    uid = session["user_id"]
     sp = os.path.join(ROOT, 'output', 'user_hkd_assets.xlsx')
     if not os.path.exists(sp):
         return jsonify({'error': 'Sample not found'}), 404
@@ -170,6 +225,7 @@ def api_import_sample():
     except Exception as ex:
         return jsonify({'error': str(ex)}), 400
 
+
 @app.route('/api/sow-types', methods=['GET'])
 def api_sow_types():
     return jsonify([{
@@ -178,6 +234,8 @@ def api_sow_types():
         'default_monthly_contribution': v.default_monthly_contribution
     } for k, v in SOW_TYPES.items()])
 
+
 if __name__ == '__main__':
-    print('LocusAdvisory Web Server on http://127.0.0.1:5001')
-    app.run(host='0.0.0.0', port=5001, debug=False)
+    port = int(os.environ.get("PORT", 5001))
+    print(f'LocusAdvisory Web Server on http://127.0.0.1:{port}')
+    app.run(host='0.0.0.0', port=port, debug=False)

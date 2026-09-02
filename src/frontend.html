@@ -16,6 +16,8 @@
   .header { background: var(--card); border-radius: 12px; padding: 28px 32px; margin-bottom: 24px; box-shadow: 0 2px 12px rgba(0,0,0,0.06); display: flex; justify-content: space-between; align-items: center; }
   .header h1 { font-size: 26px; }
   .header .subtitle { color: var(--muted); font-size: 14px; margin-top: 4px; }
+  .header .user-info { display: flex; align-items: center; gap: 12px; }
+  .header .user-info .username { font-weight: 600; font-size: 14px; }
   .card { background: var(--card); border-radius: 12px; padding: 24px 28px; margin-bottom: 24px; box-shadow: 0 2px 8px rgba(0,0,0,0.04); }
   .card h2 { margin: 0 0 16px 0; font-size: 17px; }
   .tabs { display: flex; gap: 8px; margin-bottom: 16px; flex-wrap: wrap; }
@@ -35,6 +37,8 @@
   input, select { padding: 8px 12px; border: 1px solid var(--border); border-radius: 6px; font-size: 13px; width: 100%; }
   .form-row { display: grid; grid-template-columns: 180px 1fr auto; gap: 12px; margin-bottom: 8px; align-items: center; }
   .form-row label { font-size: 13px; color: var(--muted); }
+  .form-row-simple { margin-bottom: 12px; }
+  .form-row-simple label { display: block; font-size: 13px; color: var(--muted); margin-bottom: 4px; }
   .table-actions { display: flex; gap: 8px; }
   .modal-overlay { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 1000; align-items: center; justify-content: center; }
   .modal-overlay.active { display: flex; }
@@ -58,26 +62,55 @@
   .mv-row { display: grid; grid-template-columns: 120px 1fr auto; gap: 8px; margin-bottom: 6px; align-items: center; }
   .pos { color: var(--pos); }
   .neg { color: var(--neg); }
+  .auth-wrapper { display: flex; justify-content: center; align-items: center; min-height: 80vh; }
+  .auth-card { background: var(--card); border-radius: 12px; padding: 40px 36px; box-shadow: 0 4px 20px rgba(0,0,0,0.08); width: 400px; }
+  .auth-card h2 { text-align: center; margin-bottom: 24px; font-size: 22px; }
+  .auth-card .form-row-simple label { font-size: 13px; color: var(--muted); margin-bottom: 4px; }
+  .auth-card button { width: 100%; margin-top: 8px; }
+  .auth-card .switch-link { text-align: center; margin-top: 16px; font-size: 13px; color: var(--muted); }
+  .auth-card .switch-link a { color: var(--accent); cursor: pointer; text-decoration: underline; }
 </style>
 </head>
 <body>
 <div class="container">
-  <div class="header">
-    <div>
-      <h1>LocusAdvisory - Wealth Dashboard</h1>
-      <div class="subtitle">Manage your assets, import data, and run forecasts</div>
-    </div>
-    <div>
-      <select id="userSelect" onchange="onUserChange()" style="width: 200px; display: inline-block;">
-        <option value="">-- Select User --</option>
-      </select>
-      <button class="btn btn-primary" onclick="showCreateUserModal()">+ New User</button>
+
+  <div id="authView" class="auth-wrapper">
+    <div class="auth-card">
+      <h2 id="authTitle">Sign In to LocusAdvisory</h2>
+      <div id="authMode" data-mode="login"></div>
+      <div class="form-row-simple">
+        <label>Username</label>
+        <input id="authUsername">
+      </div>
+      <div class="form-row-simple">
+        <label>Email <span class="hidden" id="emailLabel">(required for signup)</span></label>
+        <input id="authEmail" type="email">
+      </div>
+      <div class="form-row-simple">
+        <label>Password</label>
+        <input id="authPassword" type="password">
+      </div>
+      <button class="btn btn-primary" onclick="submitAuth()" id="authSubmitBtn">Sign In</button>
+      <div class="switch-link" id="switchLink">
+        New here? <a onclick="toggleAuthMode()">Create an account</a>
+      </div>
     </div>
   </div>
 
-  <div id="flash"></div>
-
   <div id="mainApp" class="hidden">
+    <div class="header">
+      <div>
+        <h1>LocusAdvisory - Wealth Dashboard</h1>
+        <div class="subtitle">Manage your assets, import data, and run forecasts</div>
+      </div>
+      <div class="user-info">
+        <span class="username" id="userLabel"></span>
+        <button class="btn btn-secondary btn-sm" onclick="logout()">Sign Out</button>
+      </div>
+    </div>
+
+    <div id="flash"></div>
+
     <div class="tabs">
       <button class="tab active" onclick="switchTab(event, 'assets')">Assets</button>
       <button class="tab" onclick="switchTab(event, 'forecast')">Forecast</button>
@@ -128,7 +161,7 @@
         </div>
         <div class="form-row">
           <label>SOW Contribution Overrides</label>
-          <input id="sowContribOverride" placeholder="e.g. CMWB Savings=0,HSBC Savings=20000">
+          <input id="sowContribOverride" placeholder="e.g. CMWB=0,HSBC saving=20000">
           <span></span>
         </div>
         <div class="form-row">
@@ -167,19 +200,6 @@
   </div>
 </div>
 
-<div id="createUserModal" class="modal-overlay">
-  <div class="modal">
-    <h3>Create New User</h3>
-    <div class="form-row"><label>Username</label><input id="newUsername"><span></span></div>
-    <div class="form-row"><label>Email</label><input id="newEmail"><span></span></div>
-    <div class="form-row"><label>Password</label><input id="newPassword" type="password"><span></span></div>
-    <div style="display: flex; gap: 8px; justify-content: flex-end; margin-top: 16px;">
-      <button class="btn btn-secondary" onclick="hideModal('createUserModal')">Cancel</button>
-      <button class="btn btn-primary" onclick="createUser()">Create</button>
-    </div>
-  </div>
-</div>
-
 <div id="addAssetModal" class="modal-overlay">
   <div class="modal">
     <h3>Add Asset</h3>
@@ -208,26 +228,38 @@
 let currentUserId = null;
 let editingAssetId = null;
 let charts = {};
+let currentUser = null;
 
 async function api(method, path, data) {
-  const opts = { method, headers: { 'Content-Type': 'application/json' } };
+  const opts = { method, headers: { 'Content-Type': 'application/json' }, credentials: 'same-origin' };
   if (data) opts.body = JSON.stringify(data);
   const res = await fetch(path, opts);
   const json = await res.json();
+  if (res.status === 401) {
+    session.clear();
+    showAuthView();
+    throw new Error(json.error || 'Unauthorized');
+  }
   if (!res.ok) throw new Error(json.error || 'Request failed');
   return json;
 }
 
 async function apiForm(method, path, formData) {
-  const opts = { method, body: formData };
+  const opts = { method, body: formData, credentials: 'same-origin' };
   const res = await fetch(path, opts);
   const json = await res.json();
+  if (res.status === 401) {
+    session.clear();
+    showAuthView();
+    throw new Error(json.error || 'Unauthorized');
+  }
   if (!res.ok) throw new Error(json.error || 'Request failed');
   return json;
 }
 
 function showFlash(msg, type) {
   const el = document.getElementById('flash');
+  if (!el) { alert(msg); return; }
   el.innerHTML = '<div class="flash flash-' + (type || 'success') + '">' + msg + '</div>';
   setTimeout(function() { el.innerHTML = ''; }, 4000);
 }
@@ -242,13 +274,79 @@ function switchTab(e, tabId) {
 function showModal(id) { document.getElementById(id).classList.add('active'); }
 function hideModal(id) { document.getElementById(id).classList.remove('active'); }
 
-function showCreateUserModal() { showModal('createUserModal'); }
+function toggleAuthMode() {
+  const mode = document.getElementById('authMode').dataset.mode;
+  if (mode === 'login') {
+    document.getElementById('authMode').dataset.mode = 'signup';
+    document.getElementById('authTitle').textContent = 'Create Your Account';
+    document.getElementById('authSubmitBtn').textContent = 'Create Account';
+    document.getElementById('authEmail').parentElement.classList.remove('hidden');
+    document.getElementById('emailLabel').classList.remove('hidden');
+    document.getElementById('switchLink').innerHTML =
+      'Already have an account? <a onclick="toggleAuthMode()">Sign in</a>';
+  } else {
+    document.getElementById('authMode').dataset.mode = 'login';
+    document.getElementById('authTitle').textContent = 'Sign In to LocusAdvisory';
+    document.getElementById('authSubmitBtn').textContent = 'Sign In';
+    document.getElementById('authEmail').parentElement.classList.add('hidden');
+    document.getElementById('emailLabel').classList.add('hidden');
+    document.getElementById('switchLink').innerHTML =
+      'New here? <a onclick="toggleAuthMode()">Create an account</a>';
+  }
+}
 
-function showAddAssetModal() {
-  if (!currentUserId) { showFlash('Please select a user first', 'error'); return; }
-  populateSowTypes('newAssetType');
-  document.getElementById('newAssetName').value = '';
-  showModal('addAssetModal');
+async function submitAuth() {
+  const mode = document.getElementById('authMode').dataset.mode;
+  const username = document.getElementById('authUsername').value.trim();
+  const password = document.getElementById('authPassword').value;
+
+  if (!username || !password) { alert('Username and password required'); return; }
+
+  try {
+    let result;
+    if (mode === 'signup') {
+      const email = document.getElementById('authEmail').value.trim();
+      if (!email) { alert('Email required for signup'); return; }
+      result = await api('POST', '/api/users', { username: username, email: email, password: password });
+    } else {
+      result = await api('POST', '/api/login', { username: username, password: password });
+    }
+    currentUser = result;
+    currentUserId = result.id;
+    showMainApp();
+  } catch (e) {
+    alert(e.message);
+  }
+}
+
+async function logout() {
+  try { await api('POST', '/api/logout'); } catch(e) {}
+  currentUser = null;
+  currentUserId = null;
+  showAuthView();
+}
+
+function showAuthView() {
+  document.getElementById('mainApp').classList.add('hidden');
+  document.getElementById('authView').classList.remove('hidden');
+}
+
+function showMainApp() {
+  document.getElementById('authView').classList.add('hidden');
+  document.getElementById('mainApp').classList.remove('hidden');
+  document.getElementById('userLabel').textContent = currentUser.username;
+  loadAssets();
+}
+
+async function checkAuth() {
+  try {
+    const user = await api('GET', '/api/me');
+    currentUser = user;
+    currentUserId = user.id;
+    showMainApp();
+  } catch (e) {
+    showAuthView();
+  }
 }
 
 async function populateSowTypes(selectId) {
@@ -257,48 +355,17 @@ async function populateSowTypes(selectId) {
   sel.innerHTML = types.map(function(t) { return '<option value="' + t.key + '">' + t.label + '</option>'; }).join('');
 }
 
-async function loadUsers() {
-  try {
-    const users = await api('GET', '/api/users');
-    const sel = document.getElementById('userSelect');
-    sel.innerHTML = '<option value="">-- Select User --</option>' +
-      users.map(function(u) { return '<option value="' + u.id + '">' + u.username + ' (' + u.email + ')</option>'; }).join('');
-    if (users.length > 0 && !currentUserId) {
-      currentUserId = users[0].id;
-      sel.value = currentUserId;
-      onUserChange();
-    }
-  } catch (e) { console.error(e); }
-}
-
-function onUserChange() {
-  currentUserId = parseInt(document.getElementById('userSelect').value) || null;
-  if (currentUserId) {
-    document.getElementById('mainApp').classList.remove('hidden');
-    loadAssets();
-  } else {
-    document.getElementById('mainApp').classList.add('hidden');
-  }
-}
-
-async function createUser() {
-  const username = document.getElementById('newUsername').value.trim();
-  const email = document.getElementById('newEmail').value.trim();
-  const password = document.getElementById('newPassword').value;
-  try {
-    const user = await api('POST', '/api/users', { username: username, email: email, password: password });
-    hideModal('createUserModal');
-    showFlash('User created: ' + user.username);
-    loadUsers();
-    document.getElementById('userSelect').value = user.id;
-    onUserChange();
-  } catch (e) { showFlash(e.message, 'error'); }
+function showAddAssetModal() {
+  if (!currentUserId) { alert('Please sign in first'); return; }
+  populateSowTypes('newAssetType');
+  document.getElementById('newAssetName').value = '';
+  showModal('addAssetModal');
 }
 
 async function loadAssets() {
   if (!currentUserId) return;
   try {
-    const assets = await api('GET', '/api/assets?user_id=' + currentUserId);
+    const assets = await api('GET', '/api/assets');
     const tbody = document.getElementById('assetTableBody');
     tbody.innerHTML = '';
     if (assets.length === 0) {
@@ -334,7 +401,7 @@ async function addAsset() {
   const name = document.getElementById('newAssetName').value.trim();
   const type = document.getElementById('newAssetType').value;
   try {
-    await api('POST', '/api/assets', { user_id: currentUserId, name: name, sow_type: type });
+    await api('POST', '/api/assets', { name: name, sow_type: type });
     hideModal('addAssetModal');
     showFlash('Asset added');
     loadAssets();
@@ -369,7 +436,7 @@ async function saveAsset() {
   const name = document.getElementById('editAssetName').value.trim();
   const type = document.getElementById('editAssetType').value;
   try {
-    await api('PUT', '/api/assets/' + editingAssetId, { user_id: currentUserId, name: name, sow_type: type });
+    await api('PUT', '/api/assets/' + editingAssetId, { name: name, sow_type: type });
     hideModal('editAssetModal');
     showFlash('Asset updated');
     loadAssets();
@@ -379,7 +446,7 @@ async function saveAsset() {
 async function deleteAsset(id) {
   if (!confirm('Delete this asset and all its monthly values?')) return;
   try {
-    await api('DELETE', '/api/assets/' + id + '?user_id=' + currentUserId);
+    await api('DELETE', '/api/assets/' + id);
     showFlash('Asset deleted');
     loadAssets();
   } catch (e) { showFlash(e.message, 'error'); }
@@ -390,7 +457,7 @@ async function addMV(assetId) {
   const value = document.getElementById('mvValue_' + assetId).value;
   if (!month || value === '') { showFlash('Both month and value required', 'error'); return; }
   try {
-    await api('POST', '/api/assets/' + assetId + '/mv', { user_id: currentUserId, month: month, value: parseFloat(value) });
+    await api('POST', '/api/assets/' + assetId + '/mv', { month: month, value: parseFloat(value) });
     showFlash('Monthly value added');
     loadAssets();
   } catch (e) { showFlash(e.message, 'error'); }
@@ -399,7 +466,7 @@ async function addMV(assetId) {
 async function deleteMV(assetId, month) {
   if (!confirm('Delete value for ' + month + '?')) return;
   try {
-    await api('DELETE', '/api/assets/' + assetId + '/mv/' + month + '?user_id=' + currentUserId);
+    await api('DELETE', '/api/assets/' + assetId + '/mv/' + month);
     showFlash('Monthly value deleted');
     loadAssets();
   } catch (e) { showFlash(e.message, 'error'); }
@@ -407,7 +474,7 @@ async function deleteMV(assetId, month) {
 
 async function importSample() {
   try {
-    const result = await api('POST', '/api/import-sample', { user_id: currentUserId });
+    const result = await api('POST', '/api/import-sample', {});
     showFlash('Imported ' + result.count + ' assets');
     loadAssets();
   } catch (e) { showFlash(e.message, 'error'); }
@@ -417,7 +484,6 @@ async function uploadExcel() {
   const fileInput = document.getElementById('excelFile');
   if (!fileInput.files[0]) { showFlash('Please select a file', 'error'); return; }
   const fd = new FormData();
-  fd.append('user_id', currentUserId);
   fd.append('file', fileInput.files[0]);
   try {
     const result = await apiForm('POST', '/api/import', fd);
@@ -464,7 +530,6 @@ async function runForecast() {
   try {
     showFlash('Running forecast...');
     const result = await api('POST', '/api/forecast', {
-      user_id: currentUserId,
       forecast_months: months,
       stochastic: stochastic,
       monte_carlo_runs: mcRuns,
@@ -548,7 +613,7 @@ function renderForecast(result) {
   }
 }
 
-loadUsers();
+checkAuth();
 </script>
 </body>
 </html>
