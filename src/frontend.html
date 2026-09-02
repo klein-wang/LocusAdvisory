@@ -115,6 +115,7 @@
       <button class="tab active" onclick="switchTab(event, 'assets')">Assets</button>
       <button class="tab" onclick="switchTab(event, 'forecast')">Forecast</button>
       <button class="tab" onclick="switchTab(event, 'import')">Import Data</button>
+      <button class="tab" onclick="switchTab(event, 'settings')">Settings</button>
     </div>
 
     <div id="assets" class="tab-content active">
@@ -189,11 +190,29 @@
       <div class="card">
         <h2>Import Data</h2>
         <p style="color: var(--muted); margin-bottom: 16px;">Import Excel (.xlsx) files or load the sample HKD assets.</p>
-        <button class="btn btn-primary" onclick="importSample()" style="margin-bottom: 16px;">Import Sample HKD Assets</button>
+        <div style="display: flex; gap: 8px; margin-bottom: 16px; flex-wrap: wrap;">
+          <button class="btn btn-primary" onclick="importSample()">Import Sample HKD Assets</button>
+          <button class="btn btn-secondary" onclick="downloadTemplate()">Download Template Excel</button>
+        </div>
         <div style="border-top: 1px solid var(--border); padding-top: 16px;">
           <h3 style="margin-bottom: 12px; font-size: 15px;">Upload Custom Excel</h3>
+          <p style="color: var(--muted); font-size: 13px; margin-bottom: 12px;">Download the template above to see the expected format. Each row is one asset. Columns: <strong>SOW Name</strong>, <strong>SOW Type</strong>, then one column per month (YYYY-MM) with values.</p>
           <input type="file" id="excelFile" accept=".xlsx" style="margin-bottom: 12px;">
           <button class="btn btn-primary" onclick="uploadExcel()">Upload</button>
+        </div>
+      </div>
+    </div>
+
+    <div id="settings" class="tab-content">
+      <div class="card">
+        <h2>Forecast Settings</h2>
+        <p style="color: var(--muted); margin-bottom: 16px;">
+          These are your personal defaults used when running forecasts. Leave a field empty to use the built-in default.
+        </p>
+        <div id="settingsTable" style="overflow-x: auto;"></div>
+        <div style="margin-top: 16px; display: flex; gap: 8px;">
+          <button class="btn btn-primary" onclick="saveSettings()">Save Changes</button>
+          <button class="btn btn-secondary" onclick="resetSettingsForm()">Reset All to Defaults</button>
         </div>
       </div>
     </div>
@@ -269,6 +288,7 @@ function switchTab(e, tabId) {
   document.querySelectorAll('.tab-content').forEach(function(c) { c.classList.remove('active'); });
   e.target.classList.add('active');
   document.getElementById(tabId).classList.add('active');
+  if (tabId === 'settings') { loadSettings(); }
 }
 
 function showModal(id) { document.getElementById(id).classList.add('active'); }
@@ -480,6 +500,10 @@ async function importSample() {
   } catch (e) { showFlash(e.message, 'error'); }
 }
 
+function downloadTemplate() {
+  window.location.href = '/api/template';
+}
+
 async function uploadExcel() {
   const fileInput = document.getElementById('excelFile');
   if (!fileInput.files[0]) { showFlash('Please select a file', 'error'); return; }
@@ -611,6 +635,82 @@ function renderForecast(result) {
       options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'right' } } }
     });
   }
+}
+
+var cachedSettings = null;
+
+function fmtPct(v) { return (v == null || isNaN(v)) ? '' : (v * 100).toFixed(1); }
+function parsePct(s) {
+  if (s == null || s === '') return null;
+  var n = parseFloat(s);
+  if (isNaN(n)) return null;
+  return Math.abs(n) <= 1 ? n : n / 100;
+}
+
+async function loadSettings() {
+  if (cachedSettings) { renderSettings(cachedSettings); return; }
+  try {
+    var data = await api('GET', '/api/settings');
+    cachedSettings = data;
+    renderSettings(data);
+  } catch (e) { showFlash(e.message, 'error'); }
+}
+
+function renderSettings(data) {
+  var html = '<table style="width: 100%; border-collapse: collapse; font-size: 14px;">';
+  html += '<thead><tr style="text-align: left; border-bottom: 2px solid var(--border);">';
+  html += '<th style="padding: 8px;">SOW Type</th>';
+  html += '<th style="padding: 8px;">Default Annual Growth</th>';
+  html += '<th style="padding: 8px;">Your Annual Growth</th>';
+  html += '<th style="padding: 8px;">Default Monthly Contrib</th>';
+  html += '<th style="padding: 8px;">Your Monthly Contrib</th>';
+  html += '<th style="padding: 8px;">Stochastic Min %</th>';
+  html += '<th style="padding: 8px;">Stochastic Max %</th>';
+  html += '</tr></thead><tbody>';
+  data.sow_types.forEach(function(t) {
+    var o = t.overrides || {};
+    html += '<tr style="border-bottom: 1px solid var(--border);">';
+    html += '<td style="padding: 10px;"><strong>' + t.label + '</strong><br><span style="color: var(--muted); font-size: 12px;">' + t.key + '</span></td>';
+    html += '<td style="padding: 10px; color: var(--muted);">' + fmtPct(t.defaults.annual_growth) + '%</td>';
+    html += '<td style="padding: 10px;"><input type="number" step="0.1" style="width: 90px;" id="sg_' + t.key + '" value="' + fmtPct(o.annual_growth) + '" placeholder="default"></td>';
+    html += '<td style="padding: 10px; color: var(--muted);">' + (t.defaults.monthly_contribution || 0).toLocaleString() + '</td>';
+    html += '<td style="padding: 10px;"><input type="number" step="1" style="width: 110px;" id="sc_' + t.key + '" value="' + (o.monthly_contribution != null ? o.monthly_contribution : '') + '" placeholder="default"></td>';
+    html += '<td style="padding: 10px;"><input type="number" step="0.1" style="width: 80px;" id="smin_' + t.key + '" value="' + fmtPct(o.min_growth) + '" placeholder="default"></td>';
+    html += '<td style="padding: 10px;"><input type="number" step="0.1" style="width: 80px;" id="smax_' + t.key + '" value="' + fmtPct(o.max_growth) + '" placeholder="default"></td>';
+    html += '</tr>';
+  });
+  html += '</tbody></table>';
+  document.getElementById('settingsTable').innerHTML = html;
+}
+
+function resetSettingsForm() {
+  if (!cachedSettings) return;
+  cachedSettings.sow_types.forEach(function(t) {
+    document.getElementById('sg_' + t.key).value = '';
+    document.getElementById('sc_' + t.key).value = '';
+    document.getElementById('smin_' + t.key).value = '';
+    document.getElementById('smax_' + t.key).value = '';
+  });
+}
+
+async function saveSettings() {
+  var overrides = {};
+  cachedSettings.sow_types.forEach(function(t) {
+    var g = parsePct(document.getElementById('sg_' + t.key).value);
+    var c = document.getElementById('sc_' + t.key).value;
+    var mn = parsePct(document.getElementById('smin_' + t.key).value);
+    var mx = parsePct(document.getElementById('smax_' + t.key).value);
+    var contrib = (c == null || c === '') ? null : parseFloat(c);
+    if (g != null || contrib != null || mn != null || mx != null) {
+      overrides[t.key] = { annual_growth: g, monthly_contribution: contrib, min_growth: mn, max_growth: mx };
+    }
+  });
+  try {
+    await api('PUT', '/api/settings', { overrides: overrides });
+    showFlash('Settings saved');
+    cachedSettings = null;
+    await loadSettings();
+  } catch (e) { showFlash(e.message, 'error'); }
 }
 
 checkAuth();

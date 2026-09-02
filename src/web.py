@@ -1,5 +1,5 @@
 import json, os, sys, tempfile
-from flask import Flask, request, jsonify, session, redirect
+from flask import Flask, request, jsonify, session, redirect, send_file
 from flask_cors import CORS
 from functools import wraps
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
@@ -181,18 +181,89 @@ def api_forecast():
     sow_list = load_user_sow_data(db, uid)
     if not sow_list:
         return jsonify({'error': 'No assets'}), 400
+
+    user_overrides = db.get_user_sow_overrides(uid)
+    req_growth = dict(d.get('growth_overrides', {}))
+    req_min = dict(d.get('min_growth_overrides', {}))
+    req_max = dict(d.get('max_growth_overrides', {}))
+    req_contrib = dict(d.get('contribution_overrides', {}))
+    for st, o in user_overrides.items():
+        if o.get('annual_growth') is not None and st not in req_growth:
+            req_growth[st] = o['annual_growth']
+        if o.get('monthly_contribution') is not None and st not in req_contrib:
+            req_contrib[st] = o['monthly_contribution']
+        if o.get('min_growth') is not None and st not in req_min:
+            req_min[st] = o['min_growth']
+        if o.get('max_growth') is not None and st not in req_max:
+            req_max[st] = o['max_growth']
+
     result = run_pipeline_from_sow_list(
         sow_list=sow_list,
         forecast_months=d.get('forecast_months', 12),
         stochastic=d.get('stochastic', False),
         monte_carlo_runs=d.get('monte_carlo_runs', 500),
-        growth_overrides=d.get('growth_overrides', {}),
-        min_growth_overrides=d.get('min_growth_overrides', {}),
-        max_growth_overrides=d.get('max_growth_overrides', {}),
-        contribution_overrides=d.get('contribution_overrides', {}),
+        growth_overrides=req_growth,
+        min_growth_overrides=req_min,
+        max_growth_overrides=req_max,
+        contribution_overrides=req_contrib,
         sow_contribution_overrides=d.get('sow_contribution_overrides', {}),
     )
     return jsonify(result)
+
+
+@app.route('/api/settings', methods=['GET'])
+@login_required
+def api_get_settings():
+    from sow_types import SOW_TYPES
+    uid = session["user_id"]
+    overrides = db.get_user_sow_overrides(uid)
+    types = []
+    for key, t in SOW_TYPES.items():
+        o = overrides.get(key, {})
+        types.append({
+            "key": key,
+            "label": t.label,
+            "is_asset": t.is_asset,
+            "defaults": {
+                "annual_growth": t.default_annual_growth,
+                "monthly_contribution": t.default_monthly_contribution,
+            },
+            "overrides": {
+                "annual_growth": o.get("annual_growth"),
+                "monthly_contribution": o.get("monthly_contribution"),
+                "min_growth": o.get("min_growth"),
+                "max_growth": o.get("max_growth"),
+            },
+        })
+    return jsonify({"sow_types": types})
+
+
+@app.route('/api/settings', methods=['PUT'])
+@login_required
+def api_save_settings():
+    d = request.get_json()
+    uid = session["user_id"]
+    overrides = d.get("overrides", {})
+    cleaned = {}
+    for st, fields in overrides.items():
+        entry = {}
+        for k in ("annual_growth", "monthly_contribution", "min_growth", "max_growth"):
+            v = fields.get(k)
+            if v is None or v == "":
+                entry[k] = None
+            else:
+                try:
+                    entry[k] = float(v)
+                except (TypeError, ValueError):
+                    entry[k] = None
+        has_any = any(entry.get(k) is not None for k in entry)
+        if has_any:
+            cleaned[st] = entry
+        else:
+            db.delete_user_sow_override(uid, st)
+    if cleaned:
+        db.set_user_sow_overrides(uid, cleaned)
+    return jsonify({"ok": True})
 
 
 @app.route('/api/import', methods=['POST'])
@@ -234,6 +305,15 @@ def api_sow_types():
         'default_annual_growth': v.default_annual_growth,
         'default_monthly_contribution': v.default_monthly_contribution
     } for k, v in SOW_TYPES.items()])
+
+
+@app.route('/api/template', methods=['GET'])
+def api_template():
+    path = os.path.join(APP_DIR, 'sample_data', 'template_assets.xlsx')
+    if not os.path.exists(path):
+        return jsonify({'error': 'Template not found'}), 404
+    return send_file(path, as_attachment=True, download_name='asset_import_template.xlsx',
+                     mimetype='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
 
 
 if __name__ == '__main__':
