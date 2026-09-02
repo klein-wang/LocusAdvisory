@@ -11,10 +11,15 @@ from sow_types import SOW_TYPES
 class Database:
     def __init__(self, db_path: Optional[str] = None):
         if db_path is None:
+            db_path = os.environ.get("DB_PATH")
+        if db_path is None:
             project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
             db_dir = os.path.join(project_root, "data")
             os.makedirs(db_dir, exist_ok=True)
             db_path = os.path.join(db_dir, "locus.db")
+        db_dir = os.path.dirname(db_path)
+        if db_dir:
+            os.makedirs(db_dir, exist_ok=True)
         self.db_path = db_path
         self._init_schema()
 
@@ -101,8 +106,8 @@ class Database:
         pw_hash = self._hash_password(password)
         with self._connect() as conn:
             row = conn.execute(
-                "SELECT id, username, email FROM users WHERE username = ? AND password_hash = ?",
-                (username, pw_hash),
+                "SELECT id, username, email FROM users WHERE (username = ? OR email = ?) AND password_hash = ?",
+                (username, username, pw_hash),
             ).fetchone()
             if row:
                 return {"id": row["id"], "username": row["username"], "email": row["email"]}
