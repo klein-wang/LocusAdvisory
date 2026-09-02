@@ -189,9 +189,13 @@
       <div class="card">
         <h2>Import Data</h2>
         <p style="color: var(--muted); margin-bottom: 16px;">Import Excel (.xlsx) files or load the sample HKD assets.</p>
-        <button class="btn btn-primary" onclick="importSample()" style="margin-bottom: 16px;">Import Sample HKD Assets</button>
+        <div style="display: flex; gap: 8px; margin-bottom: 16px; flex-wrap: wrap;">
+          <button class="btn btn-primary" onclick="importSample()">Import Sample HKD Assets</button>
+          <button class="btn btn-secondary" onclick="downloadTemplate()">Download Template Excel</button>
+        </div>
         <div style="border-top: 1px solid var(--border); padding-top: 16px;">
           <h3 style="margin-bottom: 12px; font-size: 15px;">Upload Custom Excel</h3>
+          <p style="color: var(--muted); font-size: 13px; margin-bottom: 12px;">Download the template above to see the expected format. Each row is one asset. Columns: <strong>SOW Name</strong>, <strong>SOW Type</strong>, then one column per month (YYYY-MM) with values.</p>
           <input type="file" id="excelFile" accept=".xlsx" style="margin-bottom: 12px;">
           <button class="btn btn-primary" onclick="uploadExcel()">Upload</button>
         </div>
@@ -478,6 +482,10 @@ async function importSample() {
     showFlash('Imported ' + result.count + ' assets');
     loadAssets();
   } catch (e) { showFlash(e.message, 'error'); }
+}
+
+function downloadTemplate() {
+  window.location.href = '/api/template';
 }
 
 async function uploadExcel() {

@@ -1,5 +1,5 @@
 import json, os, sys, tempfile
-from flask import Flask, request, jsonify, session, redirect
+from flask import Flask, request, jsonify, session, redirect, send_file
 from flask_cors import CORS
 from functools import wraps
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
@@ -234,6 +234,15 @@ def api_sow_types():
         'default_annual_growth': v.default_annual_growth,
         'default_monthly_contribution': v.default_monthly_contribution
     } for k, v in SOW_TYPES.items()])
+
+
+@app.route('/api/template', methods=['GET'])
+def api_template():
+    path = os.path.join(APP_DIR, 'sample_data', 'template_assets.xlsx')
+    if not os.path.exists(path):
+        return jsonify({'error': 'Template not found'}), 404
+    return send_file(path, as_attachment=True, download_name='asset_import_template.xlsx',
+                     mimetype='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
 
 
 if __name__ == '__main__':
