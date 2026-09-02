@@ -1,0 +1,14 @@
+__pycache__/
+*.pyc
+*.pyo
+sample_wealth_data.xlsx
+*.xlsx
+.venv/
+venv/
+.env
+.idea/
+.vscode/
+*.egg-info/
+dist/
+build/
+.DS_Store
