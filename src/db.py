@@ -1,35 +1,72 @@
 import os
 import sqlite3
 import hashlib
+import re
+import json
+import requests
 from contextlib import contextmanager
 from datetime import datetime
 from typing import Dict, List, Optional, Tuple
 
 from sow_types import SOW_TYPES
 
-class _LibsqlConn:
-    """Thin wrapper that mimics sqlite3.Connection for libsql-client."""
-    def __init__(self, client):
-        self._client = client
-        self._autocommit = True
-        self._in_tx = False
 
-    def execute(self, sql, params=()):
-        if params is None:
-            params = ()
-        result = self._client.execute(sql, list(params))
-        return _LibsqlCursor(result)
+class _TursoConn:
+    """SQLite-like connection wrapper around Turso REST API."""
 
-    def executemany(self, sql, seq_of_params):
-        for params in seq_of_params:
-            self._client.execute(sql, list(params))
-        return _LibsqlCursor(None)
+    def __init__(self, db_url: str, auth_token: str):
+        self._api_url = self._normalize_url(db_url)
+        self._headers = {
+            "Authorization": f"Bearer {auth_token}",
+            "Content-Type": "application/json",
+        }
+        self._last_rowid = None
 
-    def executescript(self, script):
-        for stmt in script.split(";"):
-            stmt = stmt.strip()
-            if stmt:
-                self._client.execute(stmt)
+    @staticmethod
+    def _normalize_url(url: str) -> str:
+        url = url.replace("libsql://", "https://")
+        if not url.startswith("https://"):
+            url = "https://" + url
+        url = url.rstrip("/")
+        if not url.endswith("/v2/pipeline"):
+            url = url + "/v2/pipeline"
+        return url
+
+    def _send(self, statements: List[Tuple[str, list]]) -> list:
+        payload = {
+            "requests": [
+                {"type": "execute", "stmt": {"sql": sql, "args": list(args)}}
+                for sql, args in statements
+            ]
+        }
+        resp = requests.post(self._api_url, headers=self._headers, json=payload, timeout=30)
+        resp.raise_for_status()
+        body = resp.json()
+
+        results = []
+        for item in body.get("results", []):
+            response = item.get("response", {})
+            if response.get("type") == "error":
+                raise RuntimeError(f"Turso error: {response.get('message', response)}")
+            if response.get("type") == "result":
+                results.append(response["result"])
+            else:
+                results.append(None)
+        return results
+
+    def execute(self, sql: str, params=()):
+        results = self._send([(sql, params)])
+        result = results[0] if results else {}
+        return _TursoCursor(result, self)
+
+    def executemany(self, sql: str, seq_of_params):
+        statements = [(sql, p) for p in seq_of_params]
+        self._send(statements)
+        return _TursoCursor({}, self)
+
+    def executescript(self, script: str):
+        statements = self._split_sql(script)
+        self._send(statements)
 
     def commit(self):
         pass
@@ -40,40 +77,66 @@ class _LibsqlConn:
     def close(self):
         pass
 
-class _LibsqlCursor:
-    def __init__(self, result):
-        self._result = result
-        self.lastrowid = None
+    @staticmethod
+    def _split_sql(script: str) -> List[Tuple[str, list]]:
+        parts = []
+        current = []
+        in_single = False
+        in_double = False
+        for ch in script:
+            if ch == "'" and not in_double:
+                in_single = not in_single
+            elif ch == '"' and not in_single:
+                in_double = not in_double
+            if ch == ";" and not in_single and not in_double:
+                stmt = "".join(current).strip()
+                if stmt:
+                    parts.append((stmt, []))
+                current = []
+            else:
+                current.append(ch)
+        stmt = "".join(current).strip()
+        if stmt:
+            parts.append((stmt, []))
+        return parts
+
+
+class _TursoCursor:
+    def __init__(self, result: dict, conn: _TursoConn):
+        self._result = result or {}
+        self._conn = conn
 
     def fetchone(self):
-        if self._result is None:
-            return None
-        rows = self._result.rows
-        if len(rows) == 0:
+        rows = self._result.get("rows", [])
+        cols = self._result.get("cols", [])
+        if not rows:
             return None
         row = rows[0]
-        cols = self._result.columns
-        return dict(zip(cols, row))
+        if not isinstance(row, dict):
+            row = {cols[i]: row[i] for i in range(len(cols))}
+        return row
 
     def fetchall(self):
-        if self._result is None:
-            return []
-        cols = self._result.columns
-        return [dict(zip(cols, r)) for r in self._result.rows]
+        rows = self._result.get("rows", [])
+        cols = self._result.get("cols", [])
+        out = []
+        for row in rows:
+            if isinstance(row, dict):
+                out.append(row)
+            else:
+                out.append({cols[i]: row[i] for i in range(len(cols))})
+        return out
+
 
 class Database:
     def __init__(self, db_path: Optional[str] = None):
-        self._client = None
+        self._conn = None
 
         turso_url = os.environ.get("TURSO_URL")
         turso_token = os.environ.get("TURSO_AUTH_TOKEN")
 
         if turso_url and turso_token:
-            import libsql_client
-            self._client = libsql_client.create_client_sync(
-                url=turso_url,
-                auth_token=turso_token,
-            )
+            self._conn = _TursoConn(turso_url, turso_token)
             self._backend = "turso"
         else:
             if db_path is None:
@@ -94,7 +157,7 @@ class Database:
     @contextmanager
     def _connect(self):
         if self._backend == "turso":
-            yield _LibsqlConn(self._client)
+            yield self._conn
         else:
             conn = sqlite3.connect(self.db_path)
             conn.row_factory = sqlite3.Row
@@ -175,21 +238,13 @@ class Database:
     def _hash_password(password: str) -> str:
         return hashlib.sha256(password.encode()).hexdigest()
 
-    def _insert_and_get_id(self, conn, sql, params):
+    def _insert_and_get_id(self, conn, sql, params) -> int:
+        result = conn.execute(sql, params)
         if self._backend == "turso":
-            result = conn.execute(sql, params)
-            try:
-                row = result.fetchone() if hasattr(result, 'fetchone') else None
-                if row:
-                    return list(row.values())[0] if isinstance(row, dict) else row[0]
-            except Exception:
-                pass
-            result2 = conn.execute("SELECT last_insert_rowid() AS id")
-            row = result2.fetchone()
-            return row["id"] if isinstance(row, dict) else row[0]
+            last_row = conn.execute("SELECT last_insert_rowid() AS rid").fetchone()
+            return last_row["rid"]
         else:
-            cursor = conn.execute(sql, params)
-            return cursor.lastrowid
+            return result.lastrowid
 
     def create_user(self, username: str, email: str, password: str) -> int:
         now = datetime.utcnow().isoformat()
@@ -304,12 +359,19 @@ class Database:
     def batch_set_monthly_values(self, user_id: int, asset_id: int, values: Dict[str, float]):
         now = datetime.utcnow().isoformat()
         with self._connect() as conn:
-            for month, value in values.items():
-                conn.execute(
+            statements = [
+                (
                     "INSERT INTO monthly_values (asset_id, month, value, created_at) VALUES (?, ?, ?, ?) "
                     "ON CONFLICT(asset_id, month) DO UPDATE SET value = excluded.value",
-                    (asset_id, month, value, now),
+                    [asset_id, month, value, now],
                 )
+                for month, value in values.items()
+            ]
+            if self._backend == "turso":
+                conn._send(statements)
+            else:
+                for sql, params in statements:
+                    conn.execute(sql, params)
 
     def delete_monthly_value(self, user_id: int, asset_id: int, month: str):
         with self._connect() as conn:
