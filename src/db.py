@@ -32,10 +32,24 @@ class _TursoConn:
             url = url + "/v2/pipeline"
         return url
 
+    @staticmethod
+    def _encode_arg(val):
+        if val is None:
+            return {"type": "null"}
+        if isinstance(val, bool):
+            return {"type": "integer", "value": "1" if val else "0"}
+        if isinstance(val, int):
+            return {"type": "integer", "value": str(val)}
+        if isinstance(val, float):
+            return {"type": "float", "value": val}
+        if isinstance(val, (bytes, bytearray)):
+            return {"type": "blob", "value": val.hex()}
+        return {"type": "text", "value": str(val)}
+
     def _send(self, statements: List[Tuple[str, list]]) -> list:
         payload = {
             "requests": [
-                {"type": "execute", "stmt": {"sql": sql, "args": list(args)}}
+                {"type": "execute", "stmt": {"sql": sql, "args": [self._encode_arg(a) for a in args]}}
                 for sql, args in statements
             ]
         }
@@ -48,16 +62,16 @@ class _TursoConn:
             response = item.get("response", {})
             if response.get("type") == "error":
                 raise RuntimeError(f"Turso error: {response.get('message', response)}")
-            if response.get("type") == "result":
-                results.append(response["result"])
-            else:
-                results.append(None)
+            results.append(response.get("result") or {})
         return results
 
     def execute(self, sql: str, params=()):
         results = self._send([(sql, params)])
         result = results[0] if results else {}
-        return _TursoCursor(result, self)
+        cursor = _TursoCursor(result, self)
+        rid = result.get("last_insert_rowid")
+        cursor.lastrowid = int(rid) if rid is not None else None
+        return cursor
 
     def executemany(self, sql: str, seq_of_params):
         statements = [(sql, p) for p in seq_of_params]
@@ -105,27 +119,40 @@ class _TursoCursor:
     def __init__(self, result: dict, conn: _TursoConn):
         self._result = result or {}
         self._conn = conn
+        self.lastrowid = None
+
+    @staticmethod
+    def _decode_cell(cell):
+        if isinstance(cell, dict):
+            t = cell.get("type")
+            v = cell.get("value")
+            if t == "integer":
+                return int(v) if v is not None else None
+            if t == "float":
+                return float(v) if v is not None else None
+            if t == "null":
+                return None
+            if t == "blob":
+                return bytes.fromhex(v) if v else b""
+            return v
+        return cell
+
+    def _row_to_dict(self, row):
+        cols = [c.get("name", f"col_{i}") if isinstance(c, dict) else str(c)
+                for i, c in enumerate(self._result.get("cols", []))]
+        if isinstance(row, dict):
+            return {cols[i]: self._decode_cell(row[i]) for i in range(len(cols))}
+        return {cols[i]: self._decode_cell(row[i]) for i in range(len(cols))}
 
     def fetchone(self):
         rows = self._result.get("rows", [])
-        cols = self._result.get("cols", [])
         if not rows:
             return None
-        row = rows[0]
-        if not isinstance(row, dict):
-            row = {cols[i]: row[i] for i in range(len(cols))}
-        return row
+        return self._row_to_dict(rows[0])
 
     def fetchall(self):
         rows = self._result.get("rows", [])
-        cols = self._result.get("cols", [])
-        out = []
-        for row in rows:
-            if isinstance(row, dict):
-                out.append(row)
-            else:
-                out.append({cols[i]: row[i] for i in range(len(cols))})
-        return out
+        return [self._row_to_dict(r) for r in rows]
 
 
 class Database:
@@ -241,8 +268,10 @@ class Database:
     def _insert_and_get_id(self, conn, sql, params) -> int:
         result = conn.execute(sql, params)
         if self._backend == "turso":
-            last_row = conn.execute("SELECT last_insert_rowid() AS rid").fetchone()
-            return last_row["rid"]
+            rid = getattr(result, "lastrowid", None)
+            if rid is None:
+                raise RuntimeError(f"Failed to get rowid after insert: {sql}")
+            return rid
         else:
             return result.lastrowid
 
