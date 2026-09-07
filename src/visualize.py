@@ -305,11 +305,10 @@ def _write_trend_html(forecast_data: dict, output_dir: str) -> str:
   .brand-logo {{
     width: 44px; height: 44px;
     border-radius: 12px;
-    background: linear-gradient(135deg, var(--accent) 0%, var(--accent-hover) 100%);
-    display: flex; align-items: center; justify-content: center;
-    color: #fff; font-weight: 700; font-size: 18px;
+    overflow: hidden;
     box-shadow: 0 4px 14px var(--accent-glow);
   }}
+  .brand-logo img {{ width: 100%; height: 100%; object-fit: cover; display: block; }}
   .header h1 {{ margin: 0 0 4px 0; font-size: 20px; font-weight: 700; letter-spacing: -0.01em; }}
   .header .subtitle {{ color: var(--muted); font-size: 13px; }}
 
@@ -439,7 +438,7 @@ def _write_trend_html(forecast_data: dict, output_dir: str) -> str:
 <div class="container">
   <div class="header">
     <div class="header-brand">
-      <div class="brand-logo">LA</div>
+      <div class="brand-logo"><img src="/static/logo.jpg" alt="LocusAdvisory"></div>
       <div>
         <h1>LocusAdvisory</h1>
         <div class="subtitle">Wealth Forecast Dashboard</div>

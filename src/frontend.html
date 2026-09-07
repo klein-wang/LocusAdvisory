@@ -90,12 +90,10 @@
   .brand-logo {
     width: 40px; height: 40px;
     border-radius: 10px;
-    background: linear-gradient(135deg, var(--accent) 0%, var(--accent-hover) 100%);
-    display: flex; align-items: center; justify-content: center;
-    color: #fff; font-weight: 700; font-size: 16px;
-    letter-spacing: 0.5px;
+    overflow: hidden;
     box-shadow: 0 4px 12px var(--accent-glow);
   }
+  .brand-logo img { width: 100%; height: 100%; object-fit: cover; display: block; }
   .brand-text h1 {
     font-size: 17px;
     font-weight: 700;
@@ -395,12 +393,11 @@
   .auth-logo {
     width: 52px; height: 52px;
     border-radius: 14px;
-    background: linear-gradient(135deg, var(--accent) 0%, var(--accent-hover) 100%);
-    display: flex; align-items: center; justify-content: center;
-    color: #fff; font-weight: 700; font-size: 20px;
+    overflow: hidden;
     margin: 0 auto 20px;
     box-shadow: 0 6px 20px var(--accent-glow);
   }
+  .auth-logo img { width: 100%; height: 100%; object-fit: cover; display: block; }
   .auth-card h2 {
     text-align: center;
     margin-bottom: 6px;
@@ -454,7 +451,7 @@
 
   <div id="authView" class="auth-wrapper">
     <div class="auth-card">
-      <div class="auth-logo">LA</div>
+      <div class="auth-logo"><img src="/static/logo.jpg" alt="LocusAdvisory"></div>
       <h2 id="authTitle">Sign in</h2>
       <div class="auth-sub">Welcome back to LocusAdvisory</div>
       <div id="authMode" data-mode="login"></div>
@@ -480,7 +477,7 @@
   <div id="mainApp" class="hidden">
     <div class="header">
       <div class="brand">
-        <div class="brand-logo">LA</div>
+        <div class="brand-logo"><img src="/static/logo.jpg" alt="LocusAdvisory"></div>
         <div class="brand-text">
           <h1>LocusAdvisory</h1>
           <div class="subtitle">Wealth Dashboard</div>
