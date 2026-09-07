@@ -219,50 +219,236 @@ def _write_trend_html(forecast_data: dict, output_dir: str) -> str:
 """
 
     html = f"""<!DOCTYPE html>
-<html lang="en">
+<html lang="en" data-theme="light">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>LocusAdvisory - Wealth Forecast Dashboard</title>
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
 <style>
-  :root {{
-    --bg: #f5f6fa; --card: #ffffff; --text: #2c3e50; --muted: #7f8c8d;
-    --border: #ecf0f1; --accent: #3498db; --pos: #27ae60; --neg: #e74c3c;
+  :root, [data-theme="light"] {{
+    --bg: #f4f6fb;
+    --bg-elevated: #eef1f7;
+    --card: #ffffff;
+    --card-hover: #fafbfd;
+    --text: #111827;
+    --text-secondary: #374151;
+    --muted: #6b7280;
+    --border: #e5e7eb;
+    --border-strong: #d1d5db;
+    --accent: #1e40af;
+    --accent-hover: #1e3a8a;
+    --accent-subtle: #dbeafe;
+    --accent-glow: rgba(30, 64, 175, 0.15);
+    --pos: #059669;
+    --pos-subtle: #d1fae5;
+    --neg: #dc2626;
+    --neg-subtle: #fee2e2;
+    --shadow-sm: 0 1px 2px rgba(16, 24, 40, 0.04);
+    --shadow-md: 0 4px 16px rgba(16, 24, 40, 0.06);
+    --shadow-lg: 0 12px 32px rgba(16, 24, 40, 0.08);
+    --radius: 14px;
+    --chart-grid: #e5e7eb;
+    --chart-text: #6b7280;
   }}
-  * {{ box-sizing: border-box; }}
-  body {{ font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: var(--bg); margin: 0; padding: 24px; color: var(--text); }}
-  .container {{ max-width: 1200px; margin: 0 auto; }}
-  .header {{ background: var(--card); border-radius: 12px; padding: 28px 32px; margin-bottom: 24px; box-shadow: 0 2px 12px rgba(0,0,0,0.06); }}
-  .header h1 {{ margin: 0 0 4px 0; font-size: 26px; }}
-  .header .subtitle {{ color: var(--muted); font-size: 14px; }}
-  .kpi-row {{ display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 16px; margin-bottom: 24px; }}
-  .kpi {{ background: var(--card); border-radius: 12px; padding: 20px; box-shadow: 0 2px 8px rgba(0,0,0,0.04); }}
-  .kpi .label {{ font-size: 12px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.8px; margin-bottom: 6px; }}
-  .kpi .value {{ font-size: 26px; font-weight: 700; }}
-  .kpi .sub {{ font-size: 13px; color: var(--muted); margin-top: 2px; }}
-  .card {{ background: var(--card); border-radius: 12px; padding: 24px 28px; margin-bottom: 24px; box-shadow: 0 2px 8px rgba(0,0,0,0.04); }}
-  .card h2 {{ margin: 0 0 16px 0; font-size: 17px; }}
+  [data-theme="dark"] {{
+    --bg: #0b1120;
+    --bg-elevated: #111a2e;
+    --card: #131c33;
+    --card-hover: #1a2540;
+    --text: #f1f5f9;
+    --text-secondary: #cbd5e1;
+    --muted: #94a3b8;
+    --border: #1e2a48;
+    --border-strong: #2a3a5e;
+    --accent: #60a5fa;
+    --accent-hover: #93c5fd;
+    --accent-subtle: #1e3a5f;
+    --accent-glow: rgba(96, 165, 250, 0.2);
+    --pos: #34d399;
+    --pos-subtle: rgba(52, 211, 153, 0.15);
+    --neg: #f87171;
+    --neg-subtle: rgba(248, 113, 113, 0.15);
+    --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.3);
+    --shadow-md: 0 4px 16px rgba(0, 0, 0, 0.35);
+    --shadow-lg: 0 12px 32px rgba(0, 0, 0, 0.45);
+    --chart-grid: #1e2a48;
+    --chart-text: #94a3b8;
+  }}
+
+  * {{ box-sizing: border-box; margin: 0; padding: 0; }}
+
+  body {{
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', sans-serif;
+    background: var(--bg);
+    margin: 0; padding: 28px 32px;
+    color: var(--text);
+    line-height: 1.5;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    transition: background-color 0.3s ease, color 0.3s ease;
+  }}
+  .container {{ max-width: 1240px; margin: 0 auto; }}
+
+  .header {{
+    background: var(--card);
+    border-radius: var(--radius);
+    padding: 28px 32px;
+    margin-bottom: 24px;
+    box-shadow: var(--shadow-sm);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    border: 1px solid var(--border);
+  }}
+  .header-brand {{ display: flex; align-items: center; gap: 16px; }}
+  .brand-logo {{
+    width: 44px; height: 44px;
+    border-radius: 12px;
+    background: linear-gradient(135deg, var(--accent) 0%, var(--accent-hover) 100%);
+    display: flex; align-items: center; justify-content: center;
+    color: #fff; font-weight: 700; font-size: 18px;
+    box-shadow: 0 4px 14px var(--accent-glow);
+  }}
+  .header h1 {{ margin: 0 0 4px 0; font-size: 20px; font-weight: 700; letter-spacing: -0.01em; }}
+  .header .subtitle {{ color: var(--muted); font-size: 13px; }}
+
+  .theme-toggle {{
+    width: 40px; height: 40px;
+    border-radius: 10px;
+    border: 1px solid var(--border);
+    background: var(--card);
+    color: var(--muted);
+    cursor: pointer;
+    display: flex; align-items: center; justify-content: center;
+    transition: all 0.2s ease;
+    font-size: 18px;
+  }}
+  .theme-toggle:hover {{
+    background: var(--bg-elevated);
+    color: var(--accent);
+    border-color: var(--border-strong);
+  }}
+  .theme-toggle .icon-sun, .theme-toggle .icon-moon {{ display: none; }}
+  [data-theme="light"] .theme-toggle .icon-moon {{ display: inline; }}
+  [data-theme="dark"] .theme-toggle .icon-sun {{ display: inline; }}
+
+  .kpi-row {{
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+    gap: 18px;
+    margin-bottom: 24px;
+  }}
+  .kpi {{
+    background: var(--card);
+    border-radius: var(--radius);
+    padding: 22px 24px;
+    border: 1px solid var(--border);
+    position: relative;
+    overflow: hidden;
+    transition: transform 0.2s ease, box-shadow 0.2s ease, border-color 0.3s ease, background-color 0.3s ease;
+  }}
+  .kpi:hover {{ transform: translateY(-2px); box-shadow: var(--shadow-md); border-color: var(--border-strong); }}
+  .kpi::before {{
+    content: '';
+    position: absolute; top: 0; left: 0; right: 0; height: 3px;
+    background: linear-gradient(90deg, var(--accent), var(--accent-hover));
+    opacity: 0.9;
+  }}
+  .kpi .label {{
+    font-size: 11px;
+    color: var(--muted);
+    text-transform: uppercase;
+    letter-spacing: 0.8px;
+    font-weight: 600;
+    margin-bottom: 10px;
+  }}
+  .kpi .value {{
+    font-size: 28px;
+    font-weight: 700;
+    letter-spacing: -0.02em;
+    font-variant-numeric: tabular-nums;
+  }}
+  .kpi .sub {{ font-size: 12px; color: var(--muted); margin-top: 6px; }}
+
+  .card {{
+    background: var(--card);
+    border-radius: var(--radius);
+    padding: 28px 30px;
+    margin-bottom: 24px;
+    box-shadow: var(--shadow-sm);
+    border: 1px solid var(--border);
+  }}
+  .card h2 {{
+    margin: 0 0 20px 0;
+    font-size: 15px;
+    font-weight: 600;
+    letter-spacing: -0.005em;
+    color: var(--text);
+  }}
   .chart-wrap {{ position: relative; height: 460px; }}
   .chart-row {{ display: grid; grid-template-columns: 1fr 380px; gap: 24px; margin-bottom: 24px; }}
   @media (max-width: 900px) {{ .chart-row {{ grid-template-columns: 1fr; }} }}
-  table {{ width: 100%; border-collapse: collapse; margin-top: 8px; }}
-  th, td {{ padding: 11px 14px; text-align: right; border-bottom: 1px solid var(--border); font-size: 13px; }}
+
+  table {{ width: 100%; border-collapse: separate; border-spacing: 0; }}
+  th, td {{
+    padding: 14px 16px;
+    text-align: right;
+    font-size: 13px;
+    border-bottom: 1px solid var(--border);
+  }}
   th:first-child, td:first-child {{ text-align: left; }}
-  th {{ background: #f8f9fa; font-weight: 600; color: var(--text); }}
+  th {{
+    font-weight: 600;
+    color: var(--muted);
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 0.8px;
+    background: transparent;
+    border-bottom: 1px solid var(--border-strong);
+  }}
+  tbody tr {{ transition: background-color 0.15s ease; }}
+  tbody tr:hover {{ background: var(--card-hover); }}
+  tbody tr:last-child td {{ border-bottom: none; }}
+
   .positive {{ color: var(--pos); }}
   .negative {{ color: var(--neg); }}
-  .section-label {{ display: inline-block; background: var(--accent); color: #fff; padding: 2px 10px; border-radius: 10px; font-size: 11px; margin-left: 8px; vertical-align: middle; }}
-  .tabs {{ display: flex; gap: 8px; margin-bottom: 16px; }}
-  .tab {{ padding: 8px 16px; border-radius: 8px; cursor: pointer; background: #f0f2f5; font-size: 13px; font-weight: 500; }}
-  .tab.active {{ background: var(--accent); color: #fff; }}
+
+  .section-label {{
+    display: inline-block;
+    background: var(--accent-subtle);
+    color: var(--accent);
+    padding: 3px 10px;
+    border-radius: 20px;
+    font-size: 11px;
+    font-weight: 600;
+    margin-left: 8px;
+    vertical-align: middle;
+    letter-spacing: 0.3px;
+  }}
+
+  @media (max-width: 768px) {{
+    body {{ padding: 16px; }}
+    .header {{ flex-direction: column; gap: 16px; align-items: flex-start; padding: 20px; }}
+    .card {{ padding: 20px; }}
+    .kpi .value {{ font-size: 24px; }}
+  }}
 </style>
 </head>
 <body>
 <div class="container">
   <div class="header">
-    <h1>LocusAdvisory - Wealth Forecast Dashboard</h1>
-    <div class="subtitle">Projected 12-month growth & allocation across all SOW assets</div>
+    <div class="header-brand">
+      <div class="brand-logo">LA</div>
+      <div>
+        <h1>LocusAdvisory</h1>
+        <div class="subtitle">Wealth Forecast Dashboard</div>
+      </div>
+    </div>
+    <button class="theme-toggle" onclick="toggleTheme()" title="Toggle theme">
+      <span class="icon-sun">&#9728;</span>
+      <span class="icon-moon">&#9790;</span>
+    </button>
   </div>
 
   <div class="kpi-row">
@@ -331,123 +517,204 @@ const datasets = {datasets_json};
 const datasetsWithBands = {datasets_with_bands_json};
 const hasStochastic = {str(has_stochastic).lower()};
 
-new Chart(document.getElementById('trendChart').getContext('2d'), {{
-  type: 'line',
-  data: {{ labels: months, datasets: datasets }},
-  options: {{
-    responsive: true, maintainAspectRatio: false,
-    interaction: {{ mode: 'index', intersect: false }},
-    scales: {{
-      x: {{ title: {{ display: true, text: 'Month' }}, grid: {{ color: '#ecf0f1' }} }},
-      pos: {{ position: 'left', title: {{ display: true, text: 'Asset Value (HKD)' }}, grid: {{ color: '#ecf0f1' }}, ticks: {{ callback: v => '$' + v.toLocaleString() }} }},
-      neg: {{ position: 'right', title: {{ display: true, text: 'Liability (HKD)' }}, grid: {{ display: false }}, ticks: {{ callback: v => '$' + v.toLocaleString() }} }}
-    }},
-    plugins: {{
-      legend: {{ position: 'bottom', labels: {{ usePointStyle: true, padding: 14, font: {{ size: 11 }} }} }},
-      tooltip: {{ callbacks: {{ label: c => c.dataset.label + ': $' + (c.parsed.y == null ? 0 : c.parsed.y).toLocaleString() }} }}
-    }}
-  }}
-}});
+const allCharts = [];
 
-if (hasStochastic && datasetsWithBands.length > 0) {{
-  const bandCtx = document.createElement('canvas').getContext('2d');
+function getThemeVars() {{
+  const cs = getComputedStyle(document.documentElement);
+  return {{
+    grid: cs.getPropertyValue('--chart-grid').trim() || '#e5e7eb',
+    text: cs.getPropertyValue('--chart-text').trim() || '#6b7280',
+    card: cs.getPropertyValue('--card').trim() || '#ffffff',
+    border: cs.getPropertyValue('--border').trim() || '#e5e7eb',
+    textMain: cs.getPropertyValue('--text').trim() || '#111827',
+  }};
+}}
+
+function toggleTheme() {{
+  const html = document.documentElement;
+  const current = html.getAttribute('data-theme');
+  const next = current === 'dark' ? 'light' : 'dark';
+  html.setAttribute('data-theme', next);
+  localStorage.setItem('locus-theme', next);
+  updateAllCharts();
+}}
+
+function initTheme() {{
+  const saved = localStorage.getItem('locus-theme');
+  const prefersDark = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
+  const theme = saved || (prefersDark ? 'dark' : 'light');
+  document.documentElement.setAttribute('data-theme', theme);
+}}
+
+function baseTooltip(tv) {{
+  return {{
+    backgroundColor: tv.card,
+    titleColor: tv.textMain,
+    bodyColor: tv.text,
+    borderColor: tv.border,
+    borderWidth: 1,
+    padding: 12,
+    cornerRadius: 8,
+  }};
+}}
+
+function createTrendChart() {{
+  const tv = getThemeVars();
+  const chart = new Chart(document.getElementById('trendChart').getContext('2d'), {{
+    type: 'line',
+    data: {{ labels: months, datasets: datasets }},
+    options: {{
+      responsive: true, maintainAspectRatio: false,
+      interaction: {{ mode: 'index', intersect: false }},
+      scales: {{
+        x: {{
+          title: {{ display: true, text: 'Month', color: tv.text }},
+          grid: {{ color: tv.grid }},
+          ticks: {{ color: tv.text, maxRotation: 0, autoSkip: true, maxTicksLimit: 10 }}
+        }},
+        pos: {{
+          position: 'left',
+          title: {{ display: true, text: 'Asset Value (HKD)', color: tv.text }},
+          grid: {{ color: tv.grid }},
+          ticks: {{ color: tv.text, callback: v => '$' + v.toLocaleString() }}
+        }},
+        neg: {{
+          position: 'right',
+          title: {{ display: true, text: 'Liability (HKD)', color: tv.text }},
+          grid: {{ display: false }},
+          ticks: {{ color: tv.text, callback: v => '$' + v.toLocaleString() }}
+        }}
+      }},
+      plugins: {{
+        legend: {{ position: 'bottom', labels: {{ color: tv.text, usePointStyle: true, padding: 14, font: {{ size: 11 }} }} }},
+        tooltip: Object.assign(baseTooltip(tv), {{ callbacks: {{ label: c => c.dataset.label + ': $' + (c.parsed.y == null ? 0 : c.parsed.y).toLocaleString() }} }})
+      }}
+    }}
+  }});
+  return chart;
+}}
+
+function createBandCharts() {{
+  if (!hasStochastic || datasetsWithBands.length === 0) return [];
+  const charts = [];
+  const tv = getThemeVars();
   datasetsWithBands.forEach(ds => {{
     if (ds.p5 && ds.p95) {{
-      new Chart(bandCtx, {{
+      const ctx = document.createElement('canvas').getContext('2d');
+      charts.push(new Chart(ctx, {{
         type: 'line',
         data: {{
           labels: months,
           datasets: [
-            {{
-              label: ds.label + ' (P95 Upper)',
-              data: ds.p95,
-              borderColor: ds.borderColor + '44',
-              backgroundColor: 'transparent',
-              fill: '+1',
-              tension: 0.3,
-              pointRadius: 0,
-              spanGaps: false,
-              yAxisID: ds.yAxisID,
-              borderWidth: 1,
-            }},
-            {{
-              label: ds.label + ' (P5 Lower)',
-              data: ds.p5,
-              borderColor: ds.borderColor + '44',
-              backgroundColor: ds.borderColor + '22',
-              fill: '-1',
-              tension: 0.3,
-              pointRadius: 0,
-              spanGaps: false,
-              yAxisID: ds.yAxisID,
-              borderWidth: 1,
-            }},
-            {{
-              label: ds.label + ' (P50)',
-              data: ds.data,
-              borderColor: ds.borderColor,
-              backgroundColor: 'transparent',
-              tension: 0.3,
-              pointRadius: 3,
-              spanGaps: false,
-              yAxisID: ds.yAxisID,
-              borderWidth: 2,
-            }}
+            {{ label: ds.label + ' (P95)', data: ds.p95, borderColor: ds.borderColor + '44', backgroundColor: 'transparent', fill: '+1', tension: 0.3, pointRadius: 0, spanGaps: false, yAxisID: ds.yAxisID, borderWidth: 1 }},
+            {{ label: ds.label + ' (P5)', data: ds.p5, borderColor: ds.borderColor + '44', backgroundColor: ds.borderColor + '22', fill: '-1', tension: 0.3, pointRadius: 0, spanGaps: false, yAxisID: ds.yAxisID, borderWidth: 1 }},
+            {{ label: ds.label + ' (P50)', data: ds.data, borderColor: ds.borderColor, backgroundColor: 'transparent', tension: 0.35, pointRadius: 3, pointHoverRadius: 5, spanGaps: false, yAxisID: ds.yAxisID, borderWidth: 2.5 }}
           ]
         }},
         options: {{
           responsive: true, maintainAspectRatio: false,
           interaction: {{ mode: 'index', intersect: false }},
           scales: {{
-            x: {{ grid: {{ color: '#ecf0f1' }} }},
-            pos: {{ position: 'left', grid: {{ color: '#ecf0f1' }}, ticks: {{ callback: v => '$' + v.toLocaleString() }} }},
-            neg: {{ position: 'right', grid: {{ display: false }}, ticks: {{ callback: v => '$' + v.toLocaleString() }} }}
+            x: {{ grid: {{ color: tv.grid }}, ticks: {{ color: tv.text }} }},
+            pos: {{ position: 'left', grid: {{ color: tv.grid }}, ticks: {{ color: tv.text, callback: v => '$' + v.toLocaleString() }} }},
+            neg: {{ position: 'right', grid: {{ display: false }}, ticks: {{ color: tv.text, callback: v => '$' + v.toLocaleString() }} }}
           }},
           plugins: {{
             legend: {{ display: false }},
-            tooltip: {{ callbacks: {{ label: c => c.dataset.label + ': $' + (c.parsed.y == null ? 0 : c.parsed.y).toLocaleString() }} }}
+            tooltip: Object.assign(baseTooltip(tv), {{ callbacks: {{ label: c => c.dataset.label + ': $' + (c.parsed.y == null ? 0 : c.parsed.y).toLocaleString() }} }})
           }}
         }}
-      }});
+      }}));
+    }}
+  }});
+  return charts;
+}}
+
+function createBarChart() {{
+  const tv = getThemeVars();
+  const barColors = datasets.map(d => d.borderColor);
+  return new Chart(document.getElementById('barChart').getContext('2d'), {{
+    type: 'bar',
+    data: {{ labels: datasets.map(d => d.label), datasets: [{{
+      label: 'Forecast End Value (HKD)',
+      data: datasets.map(d => {{ const v = d.data.filter(x => x != null); return v.length ? v[v.length - 1] : 0; }}),
+      backgroundColor: barColors,
+      borderRadius: 6
+    }}] }},
+    options: {{
+      responsive: true, maintainAspectRatio: false,
+      indexAxis: 'y',
+      plugins: {{
+        legend: {{ display: false }},
+        tooltip: Object.assign(baseTooltip(tv), {{ callbacks: {{ label: c => '$' + c.parsed.x.toLocaleString() }} }})
+      }},
+      scales: {{
+        x: {{ grid: {{ color: tv.grid }}, ticks: {{ color: tv.text, callback: v => '$' + v.toLocaleString() }}, border: {{ color: tv.border }} }},
+        y: {{ grid: {{ display: false }}, ticks: {{ color: tv.text }}, border: {{ color: tv.border }} }}
+      }}
     }}
   }});
 }}
 
-const barColors = datasets.map(d => d.borderColor);
-new Chart(document.getElementById('barChart').getContext('2d'), {{
-  type: 'bar',
-  data: {{ labels: datasets.map(d => d.label), datasets: [{{
-    label: 'Forecast End Value (HKD)',
-    data: datasets.map(d => {{ const v = d.data.filter(x => x != null); return v.length ? v[v.length - 1] : 0; }}),
-    backgroundColor: barColors,
-    borderRadius: 4
-  }}] }},
-  options: {{
-    responsive: true, maintainAspectRatio: false,
-    indexAxis: 'y',
-    plugins: {{ legend: {{ display: false }}, tooltip: {{ callbacks: {{ label: c => '$' + c.parsed.x.toLocaleString() }} }} }},
-    scales: {{ x: {{ ticks: {{ callback: v => '$' + v.toLocaleString() }} }} }}
-  }}
-}});
-
-new Chart(document.getElementById('pieChart').getContext('2d'), {{
-  type: 'doughnut',
-  data: {{
-    labels: {pie_labels_json},
-    datasets: [{{
-      data: {pie_values_json},
-      backgroundColor: {pie_colors_json},
-      borderWidth: 2, borderColor: '#fff'
-    }}]
-  }},
-  options: {{
-    responsive: true, maintainAspectRatio: false,
-    plugins: {{
-      legend: {{ position: 'right', labels: {{ font: {{ size: 11 }}, padding: 10 }} }},
-      tooltip: {{ callbacks: {{ label: c => c.label + ': $' + c.parsed.toLocaleString() }} }}
+function createPieChart() {{
+  const tv = getThemeVars();
+  return new Chart(document.getElementById('pieChart').getContext('2d'), {{
+    type: 'doughnut',
+    data: {{
+      labels: {pie_labels_json},
+      datasets: [{{
+        data: {pie_values_json},
+        backgroundColor: {pie_colors_json},
+        borderWidth: 3,
+        borderColor: tv.card
+      }}]
+    }},
+    options: {{
+      responsive: true, maintainAspectRatio: false,
+      cutout: '62%',
+      plugins: {{
+        legend: {{ position: 'right', labels: {{ color: tv.text, font: {{ size: 12 }}, padding: 12 }} }},
+        tooltip: Object.assign(baseTooltip(tv), {{ callbacks: {{ label: c => c.label + ': $' + c.parsed.toLocaleString() }} }})
+      }}
     }}
-  }}
-}});
+  }});
+}}
+
+function updateAllCharts() {{
+  const tv = getThemeVars();
+  allCharts.forEach(chart => {{
+    if (!chart.options.scales) return;
+    Object.values(chart.options.scales).forEach(scale => {{
+      if (scale.grid && scale.grid.color !== undefined) scale.grid.color = tv.grid;
+      if (scale.ticks && scale.ticks.color !== undefined) scale.ticks.color = tv.text;
+      if (scale.title && scale.title.color !== undefined) scale.title.color = tv.text;
+      if (scale.border && scale.border.color !== undefined) scale.border.color = tv.border;
+    }});
+    if (chart.options.plugins.legend && chart.options.plugins.legend.labels) {{
+      chart.options.plugins.legend.labels.color = tv.text;
+    }}
+    if (chart.options.plugins.tooltip) {{
+      chart.options.plugins.tooltip.backgroundColor = tv.card;
+      chart.options.plugins.tooltip.titleColor = tv.textMain;
+      chart.options.plugins.tooltip.bodyColor = tv.text;
+      chart.options.plugins.tooltip.borderColor = tv.border;
+    }}
+    if (chart.data.datasets && chart.data.datasets.length > 0 && chart.data.datasets[0].borderColor !== undefined) {{
+      chart.data.datasets.forEach(ds => {{
+        if (ds.borderWidth !== undefined && chart.config.type === 'doughnut') {{
+          ds.borderColor = tv.card;
+        }}
+      }});
+    }}
+    chart.update('none');
+  }});
+}}
+
+initTheme();
+allCharts.push(createTrendChart());
+createBandCharts().forEach(c => allCharts.push(c));
+allCharts.push(createBarChart());
+allCharts.push(createPieChart());
 </script>
 </body>
 </html>"""
