@@ -7,34 +7,105 @@ from typing import Dict, List, Optional, Tuple
 
 from sow_types import SOW_TYPES
 
+class _LibsqlConn:
+    """Thin wrapper that mimics sqlite3.Connection for libsql-client."""
+    def __init__(self, client):
+        self._client = client
+        self._autocommit = True
+        self._in_tx = False
+
+    def execute(self, sql, params=()):
+        if params is None:
+            params = ()
+        result = self._client.execute(sql, list(params))
+        return _LibsqlCursor(result)
+
+    def executemany(self, sql, seq_of_params):
+        for params in seq_of_params:
+            self._client.execute(sql, list(params))
+        return _LibsqlCursor(None)
+
+    def executescript(self, script):
+        for stmt in script.split(";"):
+            stmt = stmt.strip()
+            if stmt:
+                self._client.execute(stmt)
+
+    def commit(self):
+        pass
+
+    def rollback(self):
+        pass
+
+    def close(self):
+        pass
+
+class _LibsqlCursor:
+    def __init__(self, result):
+        self._result = result
+        self.lastrowid = None
+
+    def fetchone(self):
+        if self._result is None:
+            return None
+        rows = self._result.rows
+        if len(rows) == 0:
+            return None
+        row = rows[0]
+        cols = self._result.columns
+        return dict(zip(cols, row))
+
+    def fetchall(self):
+        if self._result is None:
+            return []
+        cols = self._result.columns
+        return [dict(zip(cols, r)) for r in self._result.rows]
 
 class Database:
     def __init__(self, db_path: Optional[str] = None):
-        if db_path is None:
-            db_path = os.environ.get("DB_PATH")
-        if db_path is None:
-            project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-            db_dir = os.path.join(project_root, "data")
-            os.makedirs(db_dir, exist_ok=True)
-            db_path = os.path.join(db_dir, "locus.db")
-        db_dir = os.path.dirname(db_path)
-        if db_dir:
-            os.makedirs(db_dir, exist_ok=True)
-        self.db_path = db_path
+        self._client = None
+
+        turso_url = os.environ.get("TURSO_URL")
+        turso_token = os.environ.get("TURSO_AUTH_TOKEN")
+
+        if turso_url and turso_token:
+            import libsql_client
+            self._client = libsql_client.create_client_sync(
+                url=turso_url,
+                auth_token=turso_token,
+            )
+            self._backend = "turso"
+        else:
+            if db_path is None:
+                db_path = os.environ.get("DB_PATH")
+            if db_path is None:
+                project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+                db_dir = os.path.join(project_root, "data")
+                os.makedirs(db_dir, exist_ok=True)
+                db_path = os.path.join(db_dir, "locus.db")
+            db_dir = os.path.dirname(db_path)
+            if db_dir:
+                os.makedirs(db_dir, exist_ok=True)
+            self.db_path = db_path
+            self._backend = "sqlite"
+
         self._init_schema()
 
     @contextmanager
     def _connect(self):
-        conn = sqlite3.connect(self.db_path)
-        conn.row_factory = sqlite3.Row
-        try:
-            yield conn
-            conn.commit()
-        except Exception:
-            conn.rollback()
-            raise
-        finally:
-            conn.close()
+        if self._backend == "turso":
+            yield _LibsqlConn(self._client)
+        else:
+            conn = sqlite3.connect(self.db_path)
+            conn.row_factory = sqlite3.Row
+            try:
+                yield conn
+                conn.commit()
+            except Exception:
+                conn.rollback()
+                raise
+            finally:
+                conn.close()
 
     def _init_schema(self):
         with self._connect() as conn:
@@ -104,15 +175,31 @@ class Database:
     def _hash_password(password: str) -> str:
         return hashlib.sha256(password.encode()).hexdigest()
 
+    def _insert_and_get_id(self, conn, sql, params):
+        if self._backend == "turso":
+            result = conn.execute(sql, params)
+            try:
+                row = result.fetchone() if hasattr(result, 'fetchone') else None
+                if row:
+                    return list(row.values())[0] if isinstance(row, dict) else row[0]
+            except Exception:
+                pass
+            result2 = conn.execute("SELECT last_insert_rowid() AS id")
+            row = result2.fetchone()
+            return row["id"] if isinstance(row, dict) else row[0]
+        else:
+            cursor = conn.execute(sql, params)
+            return cursor.lastrowid
+
     def create_user(self, username: str, email: str, password: str) -> int:
         now = datetime.utcnow().isoformat()
         pw_hash = self._hash_password(password)
         with self._connect() as conn:
-            cursor = conn.execute(
+            return self._insert_and_get_id(
+                conn,
                 "INSERT INTO users (username, email, password_hash, created_at, updated_at) VALUES (?, ?, ?, ?, ?)",
                 (username, email, pw_hash, now, now),
             )
-            return cursor.lastrowid
 
     def authenticate_user(self, username: str, password: str) -> Optional[dict]:
         pw_hash = self._hash_password(password)
@@ -147,11 +234,11 @@ class Database:
             raise ValueError(f"Invalid SOW type: {sow_type}. Available: {list(SOW_TYPES.keys())}")
         now = datetime.utcnow().isoformat()
         with self._connect() as conn:
-            cursor = conn.execute(
+            return self._insert_and_get_id(
+                conn,
                 "INSERT INTO assets (user_id, name, sow_type, created_at, updated_at) VALUES (?, ?, ?, ?, ?)",
                 (user_id, name, sow_type, now, now),
             )
-            return cursor.lastrowid
 
     def get_asset(self, user_id: int, asset_id: int) -> Optional[dict]:
         with self._connect() as conn:
@@ -276,12 +363,12 @@ class Database:
     ) -> int:
         now = datetime.utcnow().isoformat()
         with self._connect() as conn:
-            cursor = conn.execute(
+            return self._insert_and_get_id(
+                conn,
                 "INSERT INTO forecast_configs (user_id, name, sow_type, growth_rate, min_growth_rate, max_growth_rate, monthly_contribution, is_default, created_at) "
                 "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
                 (user_id, name, sow_type, growth_rate, min_growth_rate, max_growth_rate, monthly_contribution, int(is_default), now),
             )
-            return cursor.lastrowid
 
     def list_forecast_configs(self, user_id: int) -> List[dict]:
         with self._connect() as conn:
@@ -310,7 +397,7 @@ class Database:
                 asset_id = self.create_asset(user_id, sow.name, sow.sow_type)
                 self.batch_set_monthly_values(user_id, asset_id, sow.monthly_values)
                 imported += 1
-            except sqlite3.IntegrityError:
+            except Exception:
                 with self._connect() as conn:
                     existing = conn.execute(
                         "SELECT id FROM assets WHERE user_id = ? AND name = ?",
