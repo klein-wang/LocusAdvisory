@@ -505,27 +505,43 @@ class Database:
                 (config_id, user_id),
             )
 
-    def import_excel_to_user(self, user_id: int, excel_path: str) -> int:
-        from excel_parser import load_excel
+    def import_excel_to_user(self, user_id: int, excel_path: str) -> dict:
+        from excel_parser import load_excel, validate_excel
+
+        errors = validate_excel(excel_path)
+        if errors:
+            raise ValueError("Validation failed:\n" + "\n".join(f"  - {e}" for e in errors))
 
         sow_list = load_excel(excel_path)
-        imported = 0
+
+        existing_assets = {a["name"]: a for a in self.list_assets(user_id)}
+
+        created = 0
+        updated = 0
 
         for sow in sow_list:
-            try:
-                asset_id = self.create_asset(user_id, sow.name, sow.sow_type, getattr(sow, 'currency', DEFAULT_CURRENCY))
+            name = sow.name.strip()
+            existing = existing_assets.get(name)
+
+            if existing:
+                self.update_asset(
+                    user_id,
+                    existing["id"],
+                    name=name,
+                    sow_type=sow.sow_type,
+                    currency=sow.currency.upper() if sow.currency else None,
+                )
+                self.batch_set_monthly_values(user_id, existing["id"], sow.monthly_values)
+                updated += 1
+            else:
+                asset_id = self.create_asset(
+                    user_id, name, sow.sow_type,
+                    currency=sow.currency.upper() if sow.currency else DEFAULT_CURRENCY,
+                )
                 self.batch_set_monthly_values(user_id, asset_id, sow.monthly_values)
-                imported += 1
-            except Exception:
-                with self._connect() as conn:
-                    existing = conn.execute(
-                        "SELECT id FROM assets WHERE user_id = ? AND name = ?",
-                        (user_id, sow.name),
-                    ).fetchone()
-                if existing:
-                    self.batch_set_monthly_values(user_id, existing["id"], sow.monthly_values)
-                    imported += 1
-        return imported
+                created += 1
+
+        return {"created": created, "updated": updated, "total": created + updated}
 
     def get_user_sow_overrides(self, user_id: int) -> dict:
         with self._connect() as conn:

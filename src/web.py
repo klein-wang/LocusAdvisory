@@ -1,4 +1,5 @@
 import json, os, sys, tempfile
+from datetime import datetime
 from flask import Flask, request, jsonify, session, redirect, send_file
 from flask_cors import CORS
 from functools import wraps
@@ -290,15 +291,45 @@ def api_import():
     f = request.files.get('file')
     if not f:
         return jsonify({'error': 'No file'}), 400
+    if not f.filename or not f.filename.lower().endswith('.xlsx'):
+        return jsonify({'error': 'Please upload an .xlsx file'}), 400
     with tempfile.NamedTemporaryFile(suffix='.xlsx', delete=False) as tmp:
         f.save(tmp.name)
         try:
-            c = db.import_excel_to_user(uid, tmp.name)
-            return jsonify({'count': c})
+             result = db.import_excel_to_user(uid, tmp.name)
+             return jsonify(result)
         except Exception as ex:
             return jsonify({'error': str(ex)}), 400
         finally:
             os.unlink(tmp.name)
+
+@app.route('/api/export', methods=['GET'])
+@login_required
+def api_export():
+    from excel_parser import write_excel
+    uid = session["user_id"]
+    sow_list = load_user_sow_data(db, uid)
+    if not sow_list:
+        return jsonify({'error': 'No assets to export'}), 400
+    tmp = tempfile.NamedTemporaryFile(suffix='.xlsx', delete=False)
+    tmp.close()
+    try:
+        write_excel(tmp.name, sow_list)
+        user = db.get_user(uid)
+        name_tag = (user.get("username", "assets") if user else "assets")
+        download_name = f"{name_tag}_assets_{datetime.now().strftime('%Y%m%d')}.xlsx"
+        return send_file(
+            tmp.name,
+            as_attachment=True,
+            download_name=download_name,
+            mimetype='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+        )
+    except Exception as ex:
+        try:
+            os.unlink(tmp.name)
+        except OSError:
+            pass
+        return jsonify({'error': f'Export failed: {str(ex)}'}), 500
 
 
 @app.route('/api/import-sample', methods=['POST'])
@@ -309,8 +340,8 @@ def api_import_sample():
     if not os.path.exists(sp):
         return jsonify({'error': 'Sample not found'}), 404
     try:
-        c = db.import_excel_to_user(uid, sp)
-        return jsonify({'count': c})
+         result = db.import_excel_to_user(uid, sp)
+         return jsonify(result)
     except Exception as ex:
         return jsonify({'error': str(ex)}), 400
 
