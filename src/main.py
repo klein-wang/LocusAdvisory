@@ -20,6 +20,7 @@ from breakdown import (
     compute_net_worth_growth,
 )
 from sow_types import SOW_TYPES, get_sow_type
+from currencies import convert_to_currency, DEFAULT_CURRENCY, DEFAULT_EXCHANGE_RATES, CURRENCIES
 
 
 def run_pipeline(
@@ -32,6 +33,8 @@ def run_pipeline(
     min_growth_overrides: Optional[Dict[str, float]] = None,
     max_growth_overrides: Optional[Dict[str, float]] = None,
     monte_carlo_runs: int = 500,
+    display_currency: str = DEFAULT_CURRENCY,
+    currency_rates: Optional[Dict[str, float]] = None,
 ) -> dict:
     sow_list = load_excel(excel_path)
 
@@ -48,6 +51,8 @@ def run_pipeline(
         min_growth_overrides=min_growth_overrides,
         max_growth_overrides=max_growth_overrides,
         monte_carlo_runs=monte_carlo_runs,
+        display_currency=display_currency,
+        currency_rates=currency_rates,
     )
 
 
@@ -61,6 +66,8 @@ def run_pipeline_from_sow_list(
     min_growth_overrides: Optional[Dict[str, float]] = None,
     max_growth_overrides: Optional[Dict[str, float]] = None,
     monte_carlo_runs: int = 500,
+    display_currency: str = DEFAULT_CURRENCY,
+    currency_rates: Optional[Dict[str, float]] = None,
 ) -> dict:
     growth_overrides = growth_overrides or {}
     contribution_overrides = contribution_overrides or {}
@@ -97,11 +104,28 @@ def run_pipeline_from_sow_list(
     forecast_month_labels = get_forecast_months(sow_list, forecast_months)
     target_months = sorted(set(forecast_month_labels))
 
-    monthly_totals = compute_monthly_totals(sow_list, forecasts_for_breakdown)
-    sow_pct = compute_percentage_breakdown(sow_list, target_months, forecasts_for_breakdown)
-    type_pct = compute_type_breakdown(sow_list, target_months, forecasts_for_breakdown)
-    asset_liability = compute_asset_vs_liability(sow_list, target_months, forecasts_for_breakdown)
-    net_worth_growth = compute_net_worth_growth(sow_list, target_months, forecasts_for_breakdown)
+    effective_rates = currency_rates if currency_rates else dict(DEFAULT_EXCHANGE_RATES)
+
+    monthly_totals = compute_monthly_totals(
+        sow_list, forecasts_for_breakdown,
+        display_currency=display_currency, currency_rates=effective_rates,
+    )
+    sow_pct = compute_percentage_breakdown(
+        sow_list, target_months, forecasts_for_breakdown,
+        display_currency=display_currency, currency_rates=effective_rates,
+    )
+    type_pct = compute_type_breakdown(
+        sow_list, target_months, forecasts_for_breakdown,
+        display_currency=display_currency, currency_rates=effective_rates,
+    )
+    asset_liability = compute_asset_vs_liability(
+        sow_list, target_months, forecasts_for_breakdown,
+        display_currency=display_currency, currency_rates=effective_rates,
+    )
+    net_worth_growth = compute_net_worth_growth(
+        sow_list, target_months, forecasts_for_breakdown,
+        display_currency=display_currency, currency_rates=effective_rates,
+    )
 
     sow_summaries = []
     for sow in sow_list:
@@ -113,6 +137,9 @@ def run_pipeline_from_sow_list(
             sorted_fm = sorted(sow_forecast.keys())
             forecast_end_val = sow_forecast[sorted_fm[-1]]
 
+        latest_val_display = convert_to_currency(latest_val, sow.currency, display_currency, effective_rates)
+        forecast_end_val_display = convert_to_currency(forecast_end_val, sow.currency, display_currency, effective_rates)
+
         type_pct_map = type_pct.get(sow.sow_type, {})
         latest_type_pct = 0.0
         if target_months:
@@ -123,9 +150,12 @@ def run_pipeline_from_sow_list(
             "sow_type": sow.sow_type,
             "type_label": stype_info.label,
             "is_asset": stype_info.is_asset,
+            "currency": sow.currency,
             "latest_historical_month": sow.latest_month,
             "latest_historical_value": latest_val,
+            "latest_historical_value_display": round(latest_val_display, 2),
             "forecast_end_value": round(forecast_end_val, 2),
+            "forecast_end_value_display": round(forecast_end_val_display, 2),
             "forecast_growth_pct": round(
                 ((forecast_end_val - latest_val) / abs(latest_val) * 100)
                 if latest_val != 0 else 0.0, 2
@@ -145,11 +175,22 @@ def run_pipeline_from_sow_list(
             if trend:
                 sorted_trend_months = sorted(trend.keys())
                 if sorted_trend_months:
-                    sow_summary["trend_end_value"] = round(trend[sorted_trend_months[-1]], 2)
+                    trend_end = trend[sorted_trend_months[-1]]
+                    sow_summary["trend_end_value"] = round(trend_end, 2)
+                    sow_summary["trend_end_value_display"] = round(
+                        convert_to_currency(trend_end, sow.currency, display_currency, effective_rates), 2
+                    )
             scenarios = stoch_data.get("scenarios", {})
             if scenarios:
                 sow_summary["scenario_end_values"] = {
                     k: round(v[sorted(v.keys())[-1]], 2) if v and sorted(v.keys()) else 0.0
+                    for k, v in scenarios.items()
+                }
+                sow_summary["scenario_end_values_display"] = {
+                    k: round(convert_to_currency(
+                        (v[sorted(v.keys())[-1]] if v and sorted(v.keys()) else 0.0),
+                        sow.currency, display_currency, effective_rates
+                    ), 2)
                     for k, v in scenarios.items()
                 }
 
@@ -173,7 +214,8 @@ def run_pipeline_from_sow_list(
                 forecast_sow = forecasts_for_breakdown.get(sow.name, {})
                 if target_months:
                     latest_tm = target_months[-1]
-                    type_total += forecast_sow.get(latest_tm, sow.latest_value)
+                    raw = forecast_sow.get(latest_tm, sow.latest_value)
+                    type_total += convert_to_currency(raw, sow.currency, display_currency, effective_rates)
 
         if values_by_month:
             latest_pct = values_by_month[target_months[-1]]
@@ -189,6 +231,8 @@ def run_pipeline_from_sow_list(
         }
 
     result = {
+        "display_currency": display_currency,
+        "currencies_used": sorted(set(s.currency for s in sow_list)),
         "sow_summaries": sow_summaries,
         "type_summary": type_summary,
         "forecast_months": forecast_month_labels,

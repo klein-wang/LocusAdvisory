@@ -2,6 +2,7 @@ from typing import Dict, List
 from datetime import datetime
 
 from sow_types import SOW_TYPES, get_sow_type
+from currencies import CURRENCIES, DEFAULT_CURRENCY
 
 
 class SOWData:
@@ -10,10 +11,12 @@ class SOWData:
         name: str,
         sow_type: str,
         monthly_values: Dict[str, float],
+        currency: str = DEFAULT_CURRENCY,
     ):
         self.name = name
         self.sow_type = sow_type
         self.monthly_values = monthly_values
+        self.currency = currency
 
     @property
     def type_label(self) -> str:
@@ -40,6 +43,7 @@ class SOWData:
         return {
             "name": self.name,
             "sow_type": self.sow_type,
+            "currency": self.currency,
             "type_label": self.type_label,
             "monthly_values": self.monthly_values,
         }
@@ -87,11 +91,12 @@ def _load_via_openpyxl(file_path: str) -> List[SOWData]:
 
     name_idx = headers.index("SOW Name")
     type_idx = headers.index("SOW Type")
+    currency_idx = headers.index("Currency") if "Currency" in headers else None
 
     monthly_cols = [
         (i, h)
         for i, h in enumerate(headers)
-        if h not in ("SOW Name", "SOW Type") and h
+        if h not in ("SOW Name", "SOW Type", "Currency") and h
     ]
 
     sow_list: List[SOWData] = []
@@ -111,6 +116,12 @@ def _load_via_openpyxl(file_path: str) -> List[SOWData]:
                 f"Available types: {', '.join(SOW_TYPES.keys())}"
             )
 
+        currency = DEFAULT_CURRENCY
+        if currency_idx is not None and currency_idx < len(row) and row[currency_idx]:
+            cur = str(row[currency_idx]).strip().upper()
+            if cur in CURRENCIES:
+                currency = cur
+
         monthly_values: Dict[str, float] = {}
         for col_idx, col_name in monthly_cols:
             if col_idx < len(row):
@@ -126,6 +137,7 @@ def _load_via_openpyxl(file_path: str) -> List[SOWData]:
                 name=name,
                 sow_type=sow_type,
                 monthly_values=monthly_values,
+                currency=currency,
             )
         )
 
@@ -145,7 +157,7 @@ def _parse_dataframe(df) -> List[SOWData]:
         )
 
     monthly_cols = [
-        c for c in df.columns if c not in ("SOW Name", "SOW Type")
+        c for c in df.columns if c not in ("SOW Name", "SOW Type", "Currency")
     ]
     monthly_cols = sorted(monthly_cols)
 
@@ -160,6 +172,12 @@ def _parse_dataframe(df) -> List[SOWData]:
                 f"Available types: {', '.join(SOW_TYPES.keys())}"
             )
 
+        currency = DEFAULT_CURRENCY
+        if "Currency" in df.columns and pd.notna(row.get("Currency")):
+            cur = str(row["Currency"]).strip().upper()
+            if cur in CURRENCIES:
+                currency = cur
+
         monthly_values: Dict[str, float] = {}
         for col in monthly_cols:
             val = row[col]
@@ -171,6 +189,7 @@ def _parse_dataframe(df) -> List[SOWData]:
                 name=name,
                 sow_type=sow_type,
                 monthly_values=monthly_values,
+                currency=currency,
             )
         )
 

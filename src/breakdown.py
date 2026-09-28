@@ -1,45 +1,84 @@
-from typing import Dict, List
+from typing import Dict, List, Optional
 
 from excel_parser import SOWData
 from sow_types import get_sow_type
+from currencies import convert_to_currency, DEFAULT_CURRENCY, DEFAULT_EXCHANGE_RATES
+
+
+def _rates_or_default(rates: Optional[Dict[str, float]]) -> Dict[str, float]:
+    return rates if rates else dict(DEFAULT_EXCHANGE_RATES)
+
+
+def _convert_sow_monthly(
+    sow: SOWData,
+    target_currency: str,
+    rates: Dict[str, float],
+    extra_monthly_vals: Optional[Dict[str, float]] = None,
+) -> Dict[str, float]:
+    converted = {}
+    for month, value in sow.monthly_values.items():
+        converted[month] = convert_to_currency(value, sow.currency, target_currency, rates)
+    if extra_monthly_vals:
+        extra_currency = getattr(extra_monthly_vals, '_currency', sow.currency)
+        for month, value in extra_monthly_vals.items():
+            converted[month] = converted.get(month, 0.0) + convert_to_currency(value, extra_currency, target_currency, rates)
+    return converted
 
 
 def compute_monthly_totals(
     sow_list: List[SOWData],
     extra_monthly: Dict[str, Dict[str, float]] = None,
+    display_currency: str = DEFAULT_CURRENCY,
+    currency_rates: Optional[Dict[str, float]] = None,
 ) -> Dict[str, float]:
+    rates = _rates_or_default(currency_rates)
     totals: Dict[str, float] = {}
 
     for sow in sow_list:
         for month, value in sow.monthly_values.items():
-            totals[month] = totals.get(month, 0.0) + value
+            converted = convert_to_currency(value, sow.currency, display_currency, rates)
+            totals[month] = totals.get(month, 0.0) + converted
 
     if extra_monthly:
         for sow_name, months_data in extra_monthly.items():
+            sow_currency = DEFAULT_CURRENCY
+            for sow in sow_list:
+                if sow.name == sow_name:
+                    sow_currency = sow.currency
+                    break
             for month, value in months_data.items():
-                totals[month] = totals.get(month, 0.0) + value
+                converted = convert_to_currency(value, sow_currency, display_currency, rates)
+                totals[month] = totals.get(month, 0.0) + converted
 
-    return totals
+    return {m: round(v, 2) for m, v in totals.items()}
 
 
 def compute_percentage_breakdown(
     sow_list: List[SOWData],
     target_months: List[str],
     extra_monthly: Dict[str, Dict[str, float]] = None,
+    display_currency: str = DEFAULT_CURRENCY,
+    currency_rates: Optional[Dict[str, float]] = None,
 ) -> Dict[str, Dict[str, float]]:
+    rates = _rates_or_default(currency_rates)
     sow_values: Dict[str, Dict[str, float]] = {}
 
     for sow in sow_list:
         sow_values[sow.name] = {}
         for month, value in sow.monthly_values.items():
-            sow_values[sow.name][month] = value
+            sow_values[sow.name][month] = convert_to_currency(value, sow.currency, display_currency, rates)
 
     if extra_monthly:
         for sow_name, months_data in extra_monthly.items():
+            sow_currency = DEFAULT_CURRENCY
+            for sow in sow_list:
+                if sow.name == sow_name:
+                    sow_currency = sow.currency
+                    break
             if sow_name not in sow_values:
                 sow_values[sow_name] = {}
             for month, value in months_data.items():
-                sow_values[sow_name][month] = value
+                sow_values[sow_name][month] = sow_values[sow_name].get(month, 0.0) + convert_to_currency(value, sow_currency, display_currency, rates)
 
     month_totals: Dict[str, float] = {}
     for sow_name, months_data in sow_values.items():
@@ -68,7 +107,10 @@ def compute_type_breakdown(
     sow_list: List[SOWData],
     target_months: List[str],
     extra_monthly: Dict[str, Dict[str, float]] = None,
+    display_currency: str = DEFAULT_CURRENCY,
+    currency_rates: Optional[Dict[str, float]] = None,
 ) -> Dict[str, Dict[str, float]]:
+    rates = _rates_or_default(currency_rates)
     sow_name_to_type = {s.name: s.sow_type for s in sow_list}
 
     type_totals: Dict[str, Dict[str, float]] = {}
@@ -79,18 +121,25 @@ def compute_type_breakdown(
             type_totals[stype] = {}
 
         for month, value in sow.monthly_values.items():
+            converted = convert_to_currency(value, sow.currency, display_currency, rates)
             type_totals[stype][month] = (
-                type_totals[stype].get(month, 0.0) + value
+                type_totals[stype].get(month, 0.0) + converted
             )
 
     if extra_monthly:
         for sow_name, months_data in extra_monthly.items():
             stype = sow_name_to_type.get(sow_name, "other")
+            sow_currency = DEFAULT_CURRENCY
+            for sow in sow_list:
+                if sow.name == sow_name:
+                    sow_currency = sow.currency
+                    break
             if stype not in type_totals:
                 type_totals[stype] = {}
             for month, value in months_data.items():
+                converted = convert_to_currency(value, sow_currency, display_currency, rates)
                 type_totals[stype][month] = (
-                    type_totals[stype].get(month, 0.0) + value
+                    type_totals[stype].get(month, 0.0) + converted
                 )
 
     grand_totals: Dict[str, float] = {}
@@ -117,7 +166,10 @@ def compute_asset_vs_liability(
     sow_list: List[SOWData],
     target_months: List[str],
     extra_monthly: Dict[str, Dict[str, float]] = None,
+    display_currency: str = DEFAULT_CURRENCY,
+    currency_rates: Optional[Dict[str, float]] = None,
 ) -> Dict[str, Dict[str, float]]:
+    rates = _rates_or_default(currency_rates)
     sow_name_to_type = {s.name: s.sow_type for s in sow_list}
 
     result: Dict[str, Dict[str, float]] = {
@@ -132,11 +184,12 @@ def compute_asset_vs_liability(
 
         for sow in sow_list:
             val = sow.get_value(month)
+            converted = convert_to_currency(val, sow.currency, display_currency, rates)
             is_asset = get_sow_type(sow.sow_type).is_asset
             if is_asset:
-                assets += val
+                assets += converted
             else:
-                liabilities += abs(val)
+                liabilities += abs(converted)
 
         if extra_monthly:
             for sow_name, months_data in extra_monthly.items():
@@ -144,11 +197,17 @@ def compute_asset_vs_liability(
                 if val == 0:
                     continue
                 stype = sow_name_to_type.get(sow_name, "investment")
+                sow_currency = DEFAULT_CURRENCY
+                for sow in sow_list:
+                    if sow.name == sow_name:
+                        sow_currency = sow.currency
+                        break
+                converted = convert_to_currency(val, sow_currency, display_currency, rates)
                 is_asset = get_sow_type(stype).is_asset
                 if is_asset:
-                    assets += val
+                    assets += converted
                 else:
-                    liabilities += abs(val)
+                    liabilities += abs(converted)
 
         result["assets"][month] = round(assets, 2)
         result["liabilities"][month] = round(liabilities, 2)
@@ -161,9 +220,13 @@ def compute_net_worth_growth(
     sow_list: List[SOWData],
     target_months: List[str],
     extra_monthly: Dict[str, Dict[str, float]] = None,
+    display_currency: str = DEFAULT_CURRENCY,
+    currency_rates: Optional[Dict[str, float]] = None,
 ) -> Dict[str, float]:
     result = compute_asset_vs_liability(
-        sow_list, target_months, extra_monthly
+        sow_list, target_months, extra_monthly,
+        display_currency=display_currency,
+        currency_rates=currency_rates,
     )
 
     net_worth_series = result["net_worth"]

@@ -13,6 +13,7 @@ def load_user_sow_data(db: Database, user_id: int) -> List[SOWData]:
                 name=item["name"],
                 sow_type=item["sow_type"],
                 monthly_values=item["monthly_values"],
+                currency=item.get("currency", "HKD"),
             ))
     return result
 
@@ -29,5 +30,5 @@ def save_sow_data_for_user(db: Database, user_id: int, sow_list: List[SOWData]):
         if existing:
             db.batch_set_monthly_values(user_id, existing["id"], sow.monthly_values)
         else:
-            asset_id = db.create_asset(user_id, sow.name, sow.sow_type)
+            asset_id = db.create_asset(user_id, sow.name, sow.sow_type, getattr(sow, 'currency', 'HKD'))
             db.batch_set_monthly_values(user_id, asset_id, sow.monthly_values)

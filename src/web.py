@@ -7,9 +7,13 @@ from db import Database
 from db_loader import load_user_sow_data
 from main import run_pipeline_from_sow_list
 from sow_types import SOW_TYPES
+from currencies import CURRENCIES, DEFAULT_CURRENCY, DEFAULT_EXCHANGE_RATES
 
 app = Flask(__name__)
 app.secret_key = os.environ.get("SECRET_KEY", "dev-secret-change-in-production")
+app.config['SESSION_COOKIE_HTTPONLY'] = True
+app.config['SESSION_COOKIE_SAMESITE'] = 'Lax'
+app.config['PERMANENT_SESSION_LIFETIME'] = 60 * 60 * 24 * 30
 
 CORS(app, supports_credentials=True, resources={r"/api/*": {
     "origins": os.environ.get("CORS_ORIGINS", "*"),
@@ -84,6 +88,7 @@ def api_create_user():
         uid = db.create_user(u, e, p)
         user = db.get_user(uid)
         session["user_id"] = uid
+        session.permanent = True
         return jsonify({'id': uid, 'username': u, 'email': e})
     except Exception as ex:
         return jsonify({'error': str(ex)}), 400
@@ -109,13 +114,16 @@ def api_add_asset():
     uid = session["user_id"]
     name = (d.get('name') or '').strip()
     st = (d.get('sow_type') or '').strip()
+    currency = (d.get('currency') or DEFAULT_CURRENCY).strip().upper()
     if not name or not st:
         return jsonify({'error': 'Fields required'}), 400
     if st not in SOW_TYPES:
         return jsonify({'error': 'Invalid type: ' + st}), 400
+    if currency not in CURRENCIES:
+        currency = DEFAULT_CURRENCY
     try:
-        aid = db.create_asset(uid, name, st)
-        return jsonify({'id': aid, 'name': name, 'sow_type': st})
+        aid = db.create_asset(uid, name, st, currency=currency)
+        return jsonify({'id': aid, 'name': name, 'sow_type': st, 'currency': currency})
     except Exception as ex:
         return jsonify({'error': str(ex)}), 400
 
@@ -127,8 +135,11 @@ def api_update_asset(aid):
     d = request.get_json()
     n = (d.get('name') or '').strip() or None
     st = (d.get('sow_type') or '').strip() or None
+    cur = (d.get('currency') or '').strip().upper() or None
+    if cur and cur not in CURRENCIES:
+        cur = None
     try:
-        db.update_asset(uid, aid, name=n, sow_type=st)
+        db.update_asset(uid, aid, name=n, sow_type=st, currency=cur)
         return jsonify({'ok': True})
     except Exception as ex:
         return jsonify({'error': str(ex)}), 400
@@ -197,6 +208,10 @@ def api_forecast():
         if o.get('max_growth') is not None and st not in req_max:
             req_max[st] = o['max_growth']
 
+    cur_settings = db.get_user_currency_settings(uid)
+    display_currency = d.get('display_currency') or cur_settings['display_currency']
+    currency_rates = cur_settings['currency_rates']
+
     result = run_pipeline_from_sow_list(
         sow_list=sow_list,
         forecast_months=d.get('forecast_months', 12),
@@ -207,6 +222,8 @@ def api_forecast():
         max_growth_overrides=req_max,
         contribution_overrides=req_contrib,
         sow_contribution_overrides=d.get('sow_contribution_overrides', {}),
+        display_currency=display_currency,
+        currency_rates=currency_rates,
     )
     return jsonify(result)
 
@@ -305,6 +322,60 @@ def api_sow_types():
         'default_annual_growth': v.default_annual_growth,
         'default_monthly_contribution': v.default_monthly_contribution
     } for k, v in SOW_TYPES.items()])
+
+
+@app.route('/api/currencies', methods=['GET'])
+def api_currencies():
+    return jsonify([{
+        'code': k, 'symbol': v.symbol, 'label': v.label
+    } for k, v in CURRENCIES.items()])
+
+
+@app.route('/api/currency-settings', methods=['GET'])
+@login_required
+def api_get_currency_settings():
+    uid = session["user_id"]
+    settings = db.get_user_currency_settings(uid)
+    return jsonify({
+        "display_currency": settings["display_currency"],
+        "currency_rates": settings["currency_rates"],
+        "default_rates": dict(DEFAULT_EXCHANGE_RATES),
+        "available_currencies": [
+            {"code": k, "symbol": v.symbol, "label": v.label}
+            for k, v in CURRENCIES.items()
+        ],
+    })
+
+
+@app.route('/api/currency-settings', methods=['PUT'])
+@login_required
+def api_save_currency_settings():
+    d = request.get_json()
+    uid = session["user_id"]
+    display_currency = (d.get('display_currency') or '').strip().upper() or None
+    if display_currency and display_currency not in CURRENCIES:
+        display_currency = None
+    rates_raw = d.get('currency_rates')
+    cleaned_rates = {}
+    if isinstance(rates_raw, dict):
+        for code, val in rates_raw.items():
+            code_upper = str(code).strip().upper()
+            if code_upper in CURRENCIES:
+                try:
+                    fv = float(val)
+                    if fv > 0:
+                        cleaned_rates[code_upper] = fv
+                except (TypeError, ValueError):
+                    pass
+    try:
+        db.set_user_currency_settings(
+            uid,
+            display_currency=display_currency,
+            currency_rates=cleaned_rates if cleaned_rates else None,
+        )
+        return jsonify({"ok": True})
+    except Exception as ex:
+        return jsonify({"error": str(ex)}), 400
 
 
 @app.route('/api/template', methods=['GET'])
