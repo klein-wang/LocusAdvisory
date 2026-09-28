@@ -20,27 +20,27 @@ SOW_TYPES: Dict[str, SOWType] = {
         key="savings",
         label="Savings Accounts",
         is_asset=True,
-        default_annual_growth=0.035,
-        default_monthly_contribution=20000.0,
+        default_annual_growth=0.1,
+        default_monthly_contribution=0.0,
     ),
     "income": SOWType(
         key="income",
         label="Stable Income",
         is_asset=True,
         default_annual_growth=0.04,
-        default_monthly_contribution=0.0,
+        default_monthly_contribution=10000.0,
     ),
     "investment": SOWType(
         key="investment",
         label="Investments",
         is_asset=True,
-        default_annual_growth=0.07,
+        default_annual_growth=0.06,
     ),
     "retirement": SOWType(
         key="retirement",
         label="Retirement Accounts",
         is_asset=True,
-        default_annual_growth=0.07,
+        default_annual_growth=0.06,
     ),
     "real_estate": SOWType(
         key="real_estate",
@@ -65,6 +65,7 @@ SOW_TYPES: Dict[str, SOWType] = {
         label="Credit & Debt",
         is_asset=False,
         default_annual_growth=0.05,
+        default_monthly_contribution=-5000.0,
     ),
 }
 
