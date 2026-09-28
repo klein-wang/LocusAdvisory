@@ -222,3 +222,75 @@ def validate_month_format(month_str: str) -> bool:
         return True
     except ValueError:
         return False
+
+def validate_excel(file_path: str) -> List[str]:
+    errors: List[str] = []
+    try:
+        sow_list = load_excel(file_path)
+    except Exception as e:
+        return [str(e)]
+
+    if not sow_list:
+        return ["Excel file contains no data rows."]
+
+    seen_names = set()
+    for i, sow in enumerate(sow_list, start=2):
+        row_num = i
+        if not sow.name or not sow.name.strip():
+            errors.append(f"Row {row_num}: SOW Name is empty.")
+            continue
+        if sow.name.strip() in seen_names:
+            errors.append(f"Row {row_num}: Duplicate SOW Name '{sow.name.strip()}' found.")
+        seen_names.add(sow.name.strip())
+
+        if sow.sow_type not in SOW_TYPES:
+            errors.append(
+                f"Row {row_num} ('{sow.name}'): invalid SOW type '{sow.sow_type}'. "
+                f"Available: {', '.join(SOW_TYPES.keys())}"
+            )
+
+        if sow.currency and sow.currency.upper() not in CURRENCIES:
+            errors.append(
+                f"Row {row_num} ('{sow.name}'): invalid currency '{sow.currency}'. "
+                f"Available: {', '.join(CURRENCIES.keys())}"
+            )
+
+        for month_key in sow.monthly_values.keys():
+            if not validate_month_format(str(month_key).strip()):
+                errors.append(
+                    f"Row {row_num} ('{sow.name}'): invalid month format "
+                    f"'{month_key}' - expected YYYY-MM (e.g. 2025-01)."
+                )
+                break
+
+    return errors
+
+def write_excel(file_path: str, sow_list: List[SOWData]) -> None:
+    from openpyxl import Workbook
+
+    all_months: List[str] = []
+    seen = set()
+    for sow in sow_list:
+        for m in sow.months:
+            if m not in seen:
+                seen.add(m)
+                all_months.append(m)
+    all_months = sorted(all_months)
+
+    wb = Workbook()
+    ws = wb.active
+    ws.title = "Assets"
+
+    headers = ["SOW Name", "SOW Type", "Currency"] + all_months
+    ws.append(headers)
+
+    for sow in sow_list:
+        row = [sow.name, sow.sow_type, sow.currency]
+        for m in all_months:
+            row.append(sow.monthly_values.get(m))
+        ws.append(row)
+
+    for col_idx, _ in enumerate(headers, start=1):
+        ws.column_dimensions[ws.cell(row=1, column=col_idx).column_letter].width = 16
+
+    wb.save(file_path)

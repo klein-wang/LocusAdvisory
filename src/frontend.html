@@ -585,6 +585,7 @@
         <div style="display: flex; gap: 10px; margin-bottom: 20px; flex-wrap: wrap;">
           <button class="btn btn-primary" onclick="importSample()">Import Sample HKD Assets</button>
           <button class="btn btn-secondary" onclick="downloadTemplate()">Download Template Excel</button>
+          <button class="btn btn-secondary" onclick="downloadMyAssets()">⬇ Download My Assets as Excel</button>
         </div>
         <div style="border-top: 1px solid var(--border); padding-top: 20px;">
           <h3>Upload Custom Excel</h3>
@@ -1000,6 +1001,10 @@ function downloadTemplate() {
   window.location.href = '/api/template';
 }
 
+function downloadMyAssets() {
+  window.location.href = '/api/export';
+}
+
 async function uploadExcel() {
   const fileInput = document.getElementById('excelFile');
   if (!fileInput.files[0]) { showFlash('Please select a file', 'error'); return; }
@@ -1007,9 +1012,12 @@ async function uploadExcel() {
   fd.append('file', fileInput.files[0]);
   try {
     const result = await apiForm('POST', '/api/import', fd);
-    showFlash('Imported ' + result.count + ' assets');
+    const msg = `Import complete: ${result.created} created, ${result.updated} updated (${result.total} total)`;
+    showFlash(msg);
     loadAssets();
-  } catch (e) { showFlash(e.message, 'error'); }
+  } catch (e) {
+    showFlash(e.message, 'error');
+  }
 }
 
 async function runForecast() {
