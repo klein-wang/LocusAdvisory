@@ -513,6 +513,7 @@
             <tr>
               <th>SOW Name</th>
               <th>Type</th>
+              <th>Currency</th>
               <th>Latest Month</th>
               <th>Latest Value</th>
               <th style="width: 140px;">Actions</th>
@@ -556,6 +557,11 @@
           <input id="growthOverride" placeholder="e.g. savings=0.035,investment=0.07">
           <span></span>
         </div>
+        <div class="form-row">
+          <label>Display Currency</label>
+          <select id="forecastDisplayCurrency"></select>
+          <span></span>
+        </div>
       </div>
       <div id="forecastResults" class="hidden">
         <div class="kpi-row" id="kpiRow"></div>
@@ -590,6 +596,22 @@
     </div>
 
     <div id="settings" class="tab-content">
+      <div class="card" style="margin-bottom: 20px;">
+        <h2>Currency Settings</h2>
+        <p style="color: var(--muted); margin-bottom: 20px;">
+          Choose your default display currency and update exchange rates. All rates are relative to USD (base = 1).
+        </p>
+        <div class="form-row" style="margin-bottom: 18px;">
+          <label>Display Currency</label>
+          <select id="displayCurrencySelect"></select>
+          <span></span>
+        </div>
+        <div id="currencyRatesTable" style="overflow-x: auto;"></div>
+        <div style="margin-top: 16px; display: flex; gap: 10px;">
+          <button class="btn btn-primary" onclick="saveCurrencySettings()">Save Currency Settings</button>
+          <button class="btn btn-secondary" onclick="resetCurrencyRatesToDefaults()">Reset Rates to Defaults</button>
+        </div>
+      </div>
       <div class="card">
         <h2>Forecast Settings</h2>
         <p style="color: var(--muted); margin-bottom: 20px;">
@@ -610,6 +632,7 @@
     <h3>Add Asset</h3>
     <div class="form-row"><label>SOW Name</label><input id="newAssetName"><span></span></div>
     <div class="form-row"><label>SOW Type</label><select id="newAssetType"></select><span></span></div>
+    <div class="form-row"><label>Currency</label><select id="newAssetCurrency"></select><span></span></div>
     <div style="display: flex; gap: 10px; justify-content: flex-end; margin-top: 20px;">
       <button class="btn btn-secondary" onclick="hideModal('addAssetModal')">Cancel</button>
       <button class="btn btn-primary" onclick="addAsset()">Add</button>
@@ -622,6 +645,7 @@
     <h3>Edit Asset</h3>
     <div class="form-row"><label>SOW Name</label><input id="editAssetName"><span></span></div>
     <div class="form-row"><label>SOW Type</label><select id="editAssetType"></select><span></span></div>
+    <div class="form-row"><label>Currency</label><select id="editAssetCurrency"></select><span></span></div>
     <div style="display: flex; gap: 10px; justify-content: flex-end; margin-top: 20px;">
       <button class="btn btn-secondary" onclick="hideModal('editAssetModal')">Cancel</button>
       <button class="btn btn-primary" onclick="saveAsset()">Save</button>
@@ -686,7 +710,8 @@ async function api(method, path, data) {
   const res = await fetch(path, opts);
   const json = await res.json();
   if (res.status === 401) {
-    session.clear();
+    currentUser = null;
+    currentUserId = null;
     showAuthView();
     throw new Error(json.error || 'Unauthorized');
   }
@@ -699,7 +724,8 @@ async function apiForm(method, path, formData) {
   const res = await fetch(path, opts);
   const json = await res.json();
   if (res.status === 401) {
-    session.clear();
+    currentUser = null;
+    currentUserId = null;
     showAuthView();
     throw new Error(json.error || 'Unauthorized');
   }
@@ -719,7 +745,7 @@ function switchTab(e, tabId) {
   document.querySelectorAll('.tab-content').forEach(function(c) { c.classList.remove('active'); });
   e.target.classList.add('active');
   document.getElementById(tabId).classList.add('active');
-  if (tabId === 'settings') { loadSettings(); }
+  if (tabId === 'settings') { loadSettings(); loadCurrencySettings(); }
 }
 
 function showModal(id) { document.getElementById(id).classList.add('active'); }
@@ -789,6 +815,7 @@ function showMainApp() {
   document.getElementById('mainApp').classList.remove('hidden');
   document.getElementById('userLabel').textContent = currentUser.username;
   loadAssets();
+  initCurrencySelects();
 }
 
 async function checkAuth() {
@@ -808,9 +835,38 @@ async function populateSowTypes(selectId) {
   sel.innerHTML = types.map(function(t) { return '<option value="' + t.key + '">' + t.label + '</option>'; }).join('');
 }
 
+var currenciesList = null;
+
+async function populateCurrencies(selectId, selectedCode) {
+  if (!currenciesList) { currenciesList = await api('GET', '/api/currencies'); }
+  var sel = document.getElementById(selectId);
+  sel.innerHTML = currenciesList.map(function(c) {
+    return '<option value="' + c.code + '">' + c.symbol + ' ' + c.code + ' - ' + c.label + '</option>';
+  }).join('');
+  if (selectedCode) {
+    for (var i = 0; i < sel.options.length; i++) {
+      if (sel.options[i].value === selectedCode) { sel.selectedIndex = i; break; }
+    }
+  }
+}
+
+function currencySymbol(code) {
+  if (!currenciesList) return '$';
+  for (var i = 0; i < currenciesList.length; i++) {
+    if (currenciesList[i].code === code) return currenciesList[i].symbol;
+  }
+  return '$';
+}
+
+function formatMoney(value, code) {
+  var sym = currencySymbol(code || 'USD');
+  return sym + (value || 0).toLocaleString(undefined, {maximumFractionDigits: 2});
+}
+
 function showAddAssetModal() {
   if (!currentUserId) { alert('Please sign in first'); return; }
   populateSowTypes('newAssetType');
+  populateCurrencies('newAssetCurrency', 'HKD');
   document.getElementById('newAssetName').value = '';
   showModal('addAssetModal');
 }
@@ -822,13 +878,14 @@ async function loadAssets() {
     const tbody = document.getElementById('assetTableBody');
     tbody.innerHTML = '';
     if (assets.length === 0) {
-      tbody.innerHTML = '<tr><td colspan="5" style="text-align:center; padding: 32px; color: var(--muted);">No assets yet. Add one or import data.</td></tr>';
+      tbody.innerHTML = '<tr><td colspan="6" style="text-align:center; padding: 32px; color: var(--muted);">No assets yet. Add one or import data.</td></tr>';
       return;
     }
     for (const a of assets) {
-      const latestVal = a.latest_value ? '$' + a.latest_value.toLocaleString(undefined, {maximumFractionDigits: 2}) : '-';
+      const cur = a.currency || 'HKD';
+      const latestVal = a.latest_value ? formatMoney(a.latest_value, cur) : '-';
       const row = document.createElement('tr');
-      row.innerHTML = '<td><strong>' + a.name + '</strong></td><td style="color: var(--muted);">' + a.sow_type + '</td><td>' + (a.latest_month || '-') + '</td><td>' + latestVal + '</td><td><div style="display:flex;gap:8px;"><button class="btn btn-secondary btn-sm" onclick="editAsset(' + a.id + ')">Edit</button><button class="btn btn-danger btn-sm" onclick="deleteAsset(' + a.id + ')">Delete</button></div></td>';
+      row.innerHTML = '<td><strong>' + a.name + '</strong></td><td style="color: var(--muted);">' + a.sow_type + '</td><td><span style="font-weight:600;">' + cur + '</span></td><td>' + (a.latest_month || '-') + '</td><td>' + latestVal + '</td><td><div style="display:flex;gap:8px;"><button class="btn btn-secondary btn-sm" onclick="editAsset(' + a.id + ')">Edit</button><button class="btn btn-danger btn-sm" onclick="deleteAsset(' + a.id + ')">Delete</button></div></td>';
       tbody.appendChild(row);
 
       const mvs = a.monthly_values || {};
@@ -838,13 +895,13 @@ async function loadAssets() {
         mvHtml = '<div style="color: var(--muted); font-size: 12px;">No monthly values yet.</div>';
       } else {
         for (const m of mvKeys) {
-          mvHtml += '<div class="mv-row"><span style="color: var(--muted);">' + m + '</span><span style="font-variant-numeric: tabular-nums;">$' + mvs[m].toLocaleString(undefined, {maximumFractionDigits: 2}) + '</span><button class="btn btn-danger btn-sm" onclick="deleteMV(' + a.id + ',\'' + m + '\')">X</button></div>';
+          mvHtml += '<div class="mv-row"><span style="color: var(--muted);">' + m + '</span><span style="font-variant-numeric: tabular-nums;">' + formatMoney(mvs[m], cur) + '</span><button class="btn btn-danger btn-sm" onclick="deleteMV(' + a.id + ',\'' + m + '\')">X</button></div>';
         }
       }
       mvHtml += '<div class="mv-row" style="margin-top: 10px; padding-top: 10px; border-top: 1px solid var(--border);"><input id="mvMonth_' + a.id + '" placeholder="YYYY-MM" style="width: 120px;"><input id="mvValue_' + a.id + '" type="number" placeholder="Value" style="flex:1;"><button class="btn btn-primary btn-sm" onclick="addMV(' + a.id + ')">Add</button></div>';
 
       const mvTr = document.createElement('tr');
-      mvTr.innerHTML = '<td colspan="5"><div class="mv-editor"><strong>Monthly Values</strong><div style="margin-top: 10px;">' + mvHtml + '</div></div></td>';
+      mvTr.innerHTML = '<td colspan="6"><div class="mv-editor"><strong>Monthly Values (' + cur + ')</strong><div style="margin-top: 10px;">' + mvHtml + '</div></div></td>';
       tbody.appendChild(mvTr);
     }
   } catch (e) { showFlash(e.message, 'error'); }
@@ -853,8 +910,9 @@ async function loadAssets() {
 async function addAsset() {
   const name = document.getElementById('newAssetName').value.trim();
   const type = document.getElementById('newAssetType').value;
+  const cur = document.getElementById('newAssetCurrency').value;
   try {
-    await api('POST', '/api/assets', { name: name, sow_type: type });
+    await api('POST', '/api/assets', { name: name, sow_type: type, currency: cur });
     hideModal('addAssetModal');
     showFlash('Asset added successfully');
     loadAssets();
@@ -863,20 +921,24 @@ async function addAsset() {
 
 function editAsset(id) {
   const rows = document.querySelectorAll('#assetTableBody tr');
-  let name = '', type = '';
+  let name = '', type = '', cur = 'HKD';
   for (let i = 0; i < rows.length; i++) {
     if (rows[i].querySelector('.btn-sm')) {
       const onclick = rows[i].querySelector('.btn-sm').getAttribute('onclick') || '';
       if (onclick.indexOf('editAsset(' + id + ')') !== -1) {
         name = rows[i].cells[0].textContent;
         type = rows[i].cells[1].textContent;
+        cur = rows[i].cells[2].textContent.trim();
         break;
       }
     }
   }
   editingAssetId = id;
   document.getElementById('editAssetName').value = name;
-  populateSowTypes('editAssetType').then(function() {
+  Promise.all([
+    populateSowTypes('editAssetType'),
+    populateCurrencies('editAssetCurrency', cur),
+  ]).then(function() {
     const sel = document.getElementById('editAssetType');
     for (let i = 0; i < sel.options.length; i++) {
       if (sel.options[i].value === type) { sel.selectedIndex = i; break; }
@@ -888,8 +950,9 @@ function editAsset(id) {
 async function saveAsset() {
   const name = document.getElementById('editAssetName').value.trim();
   const type = document.getElementById('editAssetType').value;
+  const cur = document.getElementById('editAssetCurrency').value;
   try {
-    await api('PUT', '/api/assets/' + editingAssetId, { name: name, sow_type: type });
+    await api('PUT', '/api/assets/' + editingAssetId, { name: name, sow_type: type, currency: cur });
     hideModal('editAssetModal');
     showFlash('Asset updated');
     loadAssets();
@@ -954,6 +1017,7 @@ async function runForecast() {
   const months = parseInt(document.getElementById('forecastMonths').value) || 12;
   const stochastic = document.getElementById('stochastic').checked;
   const mcRuns = parseInt(document.getElementById('mcRuns').value) || 500;
+  const displayCurrency = document.getElementById('forecastDisplayCurrency').value;
 
   const contribStr = document.getElementById('contribOverride').value.trim();
   const sowContribStr = document.getElementById('sowContribOverride').value.trim();
@@ -995,6 +1059,7 @@ async function runForecast() {
       max_growth_overrides: {},
       contribution_overrides: contribOverrides,
       sow_contribution_overrides: sowContribOverrides,
+      display_currency: displayCurrency,
     });
     showFlash('Forecast complete');
     renderForecast(result);
@@ -1008,10 +1073,12 @@ function renderForecast(result) {
   const growthPct = growth.total_growth_pct || 0;
   const pctClass = growthPct >= 0 ? 'pos' : 'neg';
   const tv = getComputedThemeVars();
+  const dispCur = result.display_currency || 'HKD';
+  const dispSym = currencySymbol(dispCur);
 
   kpiRow.innerHTML =
-    '<div class="kpi"><div class="label">Start Net Worth</div><div class="value">$' + (growth.start_net_worth || 0).toLocaleString(undefined, {maximumFractionDigits: 0}) + '</div><div class="sub">' + (growth.start_month || '') + '</div></div>' +
-    '<div class="kpi"><div class="label">End Net Worth</div><div class="value">$' + (growth.end_net_worth || 0).toLocaleString(undefined, {maximumFractionDigits: 0}) + '</div><div class="sub">' + (growth.end_month || '') + '</div></div>' +
+    '<div class="kpi"><div class="label">Start Net Worth (' + dispCur + ')</div><div class="value">' + dispSym + (growth.start_net_worth || 0).toLocaleString(undefined, {maximumFractionDigits: 0}) + '</div><div class="sub">' + (growth.start_month || '') + '</div></div>' +
+    '<div class="kpi"><div class="label">End Net Worth (' + dispCur + ')</div><div class="value">' + dispSym + (growth.end_net_worth || 0).toLocaleString(undefined, {maximumFractionDigits: 0}) + '</div><div class="sub">' + (growth.end_month || '') + '</div></div>' +
     '<div class="kpi"><div class="label">Total Growth</div><div class="value ' + pctClass + '">' + growthPct.toFixed(2) + '%</div><div class="sub">Projected change</div></div>' +
     '<div class="kpi"><div class="label">Forecast Months</div><div class="value">' + (result.forecast_months || []).length + '</div><div class="sub">Monthly projections</div></div>';
 
@@ -1023,33 +1090,58 @@ function renderForecast(result) {
   const datasets = [];
   let combinedLabels = [];
 
-  if (result.forecasts) {
+  if (result.monthly_totals) {
+    const hist = (result.sow_summaries || []);
+    let earliestHistMonth = null;
+    let earliestHistTotal = null;
+    const monthlyTotals = result.monthly_totals;
     const fmonths = result.forecast_months || [];
-    for (const [name, fc] of Object.entries(result.forecasts)) {
-      const hist = (result.sow_summaries || []).find(function(s) { return s.name === name; });
-      const histMonth = hist ? hist.latest_historical_month : null;
-      const histVal = hist ? hist.latest_historical_value : null;
-      const fcArr = fmonths.map(function(m) { return fc[m] ?? 0; });
-      const data = histMonth ? [histVal].concat(fcArr) : fcArr;
-      if (ci === 0) {
-        combinedLabels = histMonth ? [histMonth].concat(labels) : labels;
+
+    const allMonths = Object.keys(monthlyTotals).concat(fmonths.filter(function(m) { return !(m in monthlyTotals); }));
+    combinedLabels = allMonths.length ? allMonths : fmonths;
+
+    const combinedData = combinedLabels.map(function(m) { return monthlyTotals[m] ?? null; });
+    datasets.push({
+      label: 'Total (' + dispCur + ')',
+      data: combinedData,
+      borderColor: colors[ci % colors.length],
+      backgroundColor: colors[ci % colors.length] + '20',
+      tension: 0.35,
+      pointRadius: 2,
+      pointHoverRadius: 4,
+      spanGaps: true,
+      borderWidth: 3,
+    });
+    ci++;
+
+    if (result.forecasts) {
+      for (const [name, fc] of Object.entries(result.forecasts)) {
+        const fcur = (result.sow_summaries || []).find(function(s) { return s.name === name; });
+        const cur = fcur ? fcur.currency : 'HKD';
+        const histVal = fcur ? fcur.latest_historical_value : null;
+        const histMonth = fcur ? fcur.latest_historical_month : null;
+        const fcArr = fmonths.map(function(m) { return fc[m] ?? 0; });
+        const perSowLabels = histMonth ? [histMonth].concat(fmonths) : fmonths;
+        const perSowData = histVal != null ? [histVal].concat(fcArr) : fcArr;
+        datasets.push({
+          label: name + ' (' + cur + ')',
+          data: perSowData,
+          borderColor: colors[ci % colors.length],
+          backgroundColor: colors[ci % colors.length] + '20',
+          tension: 0.35,
+          pointRadius: 2,
+          pointHoverRadius: 4,
+          spanGaps: false,
+          borderWidth: 1.5,
+          borderDash: [4, 3],
+        });
+        ci++;
       }
-      datasets.push({
-        label: name,
-        data: data,
-        borderColor: colors[ci % colors.length],
-        backgroundColor: colors[ci % colors.length] + '20',
-        tension: 0.35,
-        pointRadius: 2,
-        pointHoverRadius: 4,
-        spanGaps: false,
-        borderWidth: 2.5,
-      });
-      ci++;
     }
+
     charts.trend = new Chart(ctx, {
       type: 'line',
-      data: { labels: combinedLabels, datasets: datasets },
+      data: { labels: combinedLabels.length ? combinedLabels : labels, datasets: datasets },
       options: {
         responsive: true,
         maintainAspectRatio: false,
@@ -1061,7 +1153,7 @@ function renderForecast(result) {
           },
           y: {
             grid: { color: tv.chartGrid },
-            ticks: { color: tv.chartText, callback: function(v) { return '$' + (v || 0).toLocaleString(); } }
+            ticks: { color: tv.chartText, callback: function(v) { return dispSym + (v || 0).toLocaleString(); } }
           }
         },
         plugins: {
@@ -1197,6 +1289,116 @@ async function saveSettings() {
     cachedSettings = null;
     await loadSettings();
   } catch (e) { showFlash(e.message, 'error'); }
+}
+
+var cachedCurrencySettings = null;
+
+async function initCurrencySelects() {
+  if (!currenciesList) { currenciesList = await api('GET', '/api/currencies'); }
+  var foreSel = document.getElementById('forecastDisplayCurrency');
+  if (foreSel && foreSel.options.length === 0) {
+    foreSel.innerHTML = currenciesList.map(function(c) {
+      return '<option value="' + c.code + '">' + c.symbol + ' ' + c.code + '</option>';
+    }).join('');
+  }
+  try {
+    var cs = await api('GET', '/api/currency-settings');
+    if (foreSel) {
+      for (var i = 0; i < foreSel.options.length; i++) {
+        if (foreSel.options[i].value === cs.display_currency) { foreSel.selectedIndex = i; break; }
+      }
+    }
+  } catch(e) {}
+}
+
+async function loadCurrencySettings() {
+  if (!currentUserId) return;
+  try {
+    var data = await api('GET', '/api/currency-settings');
+    cachedCurrencySettings = data;
+    renderCurrencySettings(data);
+  } catch (e) { showFlash(e.message, 'error'); }
+}
+
+function renderCurrencySettings(data) {
+  var dispSel = document.getElementById('displayCurrencySelect');
+  dispSel.innerHTML = data.available_currencies.map(function(c) {
+    return '<option value="' + c.code + '">' + c.symbol + ' ' + c.code + ' - ' + c.label + '</option>';
+  }).join('');
+  for (var i = 0; i < dispSel.options.length; i++) {
+    if (dispSel.options[i].value === data.display_currency) { dispSel.selectedIndex = i; break; }
+  }
+
+  var html = '<table style="width: 100%; border-collapse: separate; border-spacing: 0; font-size: 14px;">';
+  html += '<thead><tr>';
+  html += '<th style="text-align:left; padding: 10px;">Currency</th>';
+  html += '<th style="padding: 10px;">Default Rate (1 USD = ?)</th>';
+  html += '<th style="padding: 10px;">Your Rate</th>';
+  html += '</tr></thead><tbody>';
+
+  var baseCodes = data.available_currencies.map(function(c) { return c.code; });
+  if (baseCodes.indexOf('USD') === -1) baseCodes.unshift('USD');
+
+  for (var ci = 0; ci < baseCodes.length; ci++) {
+    var code = baseCodes[ci];
+    var curInfo = null;
+    for (var j = 0; j < data.available_currencies.length; j++) {
+      if (data.available_currencies[j].code === code) { curInfo = data.available_currencies[j]; break; }
+    }
+    var label = curInfo ? (curInfo.symbol + ' ' + curInfo.code + ' - ' + curInfo.label) : code;
+    var defaultRate = data.default_rates[code] != null ? data.default_rates[code] : '-';
+    var userRate = data.currency_rates && data.currency_rates[code] != null ? data.currency_rates[code] : '';
+    var inputId = 'cr_' + code;
+
+    html += '<tr>';
+    html += '<td style="padding: 10px;"><strong>' + label + '</strong></td>';
+    html += '<td style="padding: 10px; color: var(--muted);">' + defaultRate + '</td>';
+    if (code === 'USD') {
+      html += '<td style="padding: 10px; color: var(--muted);">1.0 (base)</td>';
+    } else {
+      html += '<td style="padding: 10px;"><input type="number" step="0.0001" min="0.0001" style="width: 130px;" id="' + inputId + '" value="' + userRate + '" placeholder="' + (data.default_rates[code] || '') + '"></td>';
+    }
+    html += '</tr>';
+  }
+  html += '</tbody></table>';
+  document.getElementById('currencyRatesTable').innerHTML = html;
+}
+
+async function saveCurrencySettings() {
+  if (!cachedCurrencySettings) return;
+  var disp = document.getElementById('displayCurrencySelect').value;
+  var rates = {};
+  var baseCodes = cachedCurrencySettings.available_currencies.map(function(c) { return c.code; });
+  for (var i = 0; i < baseCodes.length; i++) {
+    var code = baseCodes[i];
+    if (code === 'USD') continue;
+    var el = document.getElementById('cr_' + code);
+    if (el && el.value && el.value.trim()) {
+      var v = parseFloat(el.value);
+      if (!isNaN(v) && v > 0) rates[code] = v;
+    }
+  }
+  try {
+    await api('PUT', '/api/currency-settings', {
+      display_currency: disp,
+      currency_rates: rates,
+    });
+    showFlash('Currency settings saved');
+    cachedCurrencySettings = null;
+    await loadCurrencySettings();
+    await initCurrencySelects();
+  } catch (e) { showFlash(e.message, 'error'); }
+}
+
+function resetCurrencyRatesToDefaults() {
+  if (!cachedCurrencySettings) return;
+  var codes = cachedCurrencySettings.available_currencies.map(function(c) { return c.code; });
+  for (var i = 0; i < codes.length; i++) {
+    var code = codes[i];
+    if (code === 'USD') continue;
+    var el = document.getElementById('cr_' + code);
+    if (el) el.value = '';
+  }
 }
 
 initTheme();

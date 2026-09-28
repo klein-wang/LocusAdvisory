@@ -9,6 +9,7 @@ from datetime import datetime
 from typing import Dict, List, Optional, Tuple
 
 from sow_types import SOW_TYPES
+from currencies import CURRENCIES, DEFAULT_CURRENCY, DEFAULT_EXCHANGE_RATES
 
 
 class _TursoConn:
@@ -214,6 +215,7 @@ class Database:
                     user_id INTEGER NOT NULL,
                     name TEXT NOT NULL,
                     sow_type TEXT NOT NULL,
+                    currency TEXT NOT NULL DEFAULT 'HKD',
                     created_at TEXT NOT NULL,
                     updated_at TEXT NOT NULL,
                     FOREIGN KEY (user_id) REFERENCES users(id),
@@ -259,7 +261,25 @@ class Database:
                     PRIMARY KEY (user_id, sow_type),
                     FOREIGN KEY (user_id) REFERENCES users(id)
                 );
+
+                CREATE TABLE IF NOT EXISTS user_settings (
+                    user_id INTEGER PRIMARY KEY,
+                    display_currency TEXT NOT NULL DEFAULT 'HKD',
+                    currency_rates_json TEXT NOT NULL DEFAULT '{}',
+                    updated_at TEXT NOT NULL,
+                    FOREIGN KEY (user_id) REFERENCES users(id)
+                );
             """)
+            self._migrate_assets_currency(conn)
+
+    def _migrate_assets_currency(self, conn):
+        try:
+            cols = conn.execute("PRAGMA table_info(assets)").fetchall()
+            col_names = [c["name"] if isinstance(c, dict) else c[1] for c in cols]
+            if "currency" not in col_names:
+                conn.execute("ALTER TABLE assets ADD COLUMN currency TEXT NOT NULL DEFAULT 'HKD'")
+        except Exception:
+            pass
 
     @staticmethod
     def _hash_password(password: str) -> str:
@@ -313,21 +333,23 @@ class Database:
             ).fetchall()
             return [dict(r) for r in rows]
 
-    def create_asset(self, user_id: int, name: str, sow_type: str) -> int:
+    def create_asset(self, user_id: int, name: str, sow_type: str, currency: str = DEFAULT_CURRENCY) -> int:
         if sow_type not in SOW_TYPES:
             raise ValueError(f"Invalid SOW type: {sow_type}. Available: {list(SOW_TYPES.keys())}")
+        if currency not in CURRENCIES:
+            raise ValueError(f"Invalid currency: {currency}. Available: {list(CURRENCIES.keys())}")
         now = datetime.utcnow().isoformat()
         with self._connect() as conn:
             return self._insert_and_get_id(
                 conn,
-                "INSERT INTO assets (user_id, name, sow_type, created_at, updated_at) VALUES (?, ?, ?, ?, ?)",
-                (user_id, name, sow_type, now, now),
+                "INSERT INTO assets (user_id, name, sow_type, currency, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?)",
+                (user_id, name, sow_type, currency, now, now),
             )
 
     def get_asset(self, user_id: int, asset_id: int) -> Optional[dict]:
         with self._connect() as conn:
             row = conn.execute(
-                "SELECT id, user_id, name, sow_type FROM assets WHERE id = ? AND user_id = ?",
+                "SELECT id, user_id, name, sow_type, currency FROM assets WHERE id = ? AND user_id = ?",
                 (asset_id, user_id),
             ).fetchone()
             if row:
@@ -337,12 +359,12 @@ class Database:
     def list_assets(self, user_id: int) -> List[dict]:
         with self._connect() as conn:
             rows = conn.execute(
-                "SELECT id, name, sow_type, created_at FROM assets WHERE user_id = ? ORDER BY name",
+                "SELECT id, name, sow_type, currency, created_at FROM assets WHERE user_id = ? ORDER BY name",
                 (user_id,),
             ).fetchall()
             return [dict(r) for r in rows]
 
-    def update_asset(self, user_id: int, asset_id: int, name: Optional[str] = None, sow_type: Optional[str] = None):
+    def update_asset(self, user_id: int, asset_id: int, name: Optional[str] = None, sow_type: Optional[str] = None, currency: Optional[str] = None):
         updates = []
         params = []
         if name is not None:
@@ -353,6 +375,11 @@ class Database:
                 raise ValueError(f"Invalid SOW type: {sow_type}")
             updates.append("sow_type = ?")
             params.append(sow_type)
+        if currency is not None:
+            if currency not in CURRENCIES:
+                raise ValueError(f"Invalid currency: {currency}")
+            updates.append("currency = ?")
+            params.append(currency)
         if not updates:
             return
         updates.append("updated_at = ?")
@@ -424,7 +451,7 @@ class Database:
     def load_user_sow_data(self, user_id: int) -> List[dict]:
         with self._connect() as conn:
             assets = conn.execute(
-                "SELECT id, name, sow_type FROM assets WHERE user_id = ? ORDER BY name",
+                "SELECT id, name, sow_type, currency FROM assets WHERE user_id = ? ORDER BY name",
                 (user_id,),
             ).fetchall()
 
@@ -437,6 +464,7 @@ class Database:
                 result.append({
                     "name": asset["name"],
                     "sow_type": asset["sow_type"],
+                    "currency": asset["currency"],
                     "monthly_values": {r["month"]: r["value"] for r in monthly_rows},
                 })
             return result
@@ -485,7 +513,7 @@ class Database:
 
         for sow in sow_list:
             try:
-                asset_id = self.create_asset(user_id, sow.name, sow.sow_type)
+                asset_id = self.create_asset(user_id, sow.name, sow.sow_type, getattr(sow, 'currency', DEFAULT_CURRENCY))
                 self.batch_set_monthly_values(user_id, asset_id, sow.monthly_values)
                 imported += 1
             except Exception:
@@ -547,3 +575,64 @@ class Database:
                 "DELETE FROM user_sow_overrides WHERE user_id = ? AND sow_type = ?",
                 (user_id, sow_type),
             )
+
+    def get_user_currency_settings(self, user_id: int) -> dict:
+        with self._connect() as conn:
+            row = conn.execute(
+                "SELECT display_currency, currency_rates_json FROM user_settings WHERE user_id = ?",
+                (user_id,),
+            ).fetchone()
+        if row:
+            custom_rates = {}
+            rates_json = row["currency_rates_json"]
+            if rates_json:
+                try:
+                    custom_rates = json.loads(rates_json)
+                except Exception:
+                    custom_rates = {}
+            merged = {**DEFAULT_EXCHANGE_RATES, **custom_rates}
+            return {
+                "display_currency": row["display_currency"],
+                "currency_rates": merged,
+            }
+        return {
+            "display_currency": DEFAULT_CURRENCY,
+            "currency_rates": dict(DEFAULT_EXCHANGE_RATES),
+        }
+
+    def set_user_currency_settings(self, user_id: int, display_currency: Optional[str] = None, currency_rates: Optional[dict] = None) -> None:
+        if display_currency is not None and display_currency not in CURRENCIES:
+            raise ValueError(f"Invalid currency: {display_currency}")
+        now = datetime.utcnow().isoformat()
+        with self._connect() as conn:
+            existing = conn.execute(
+                "SELECT user_id FROM user_settings WHERE user_id = ?",
+                (user_id,),
+            ).fetchone()
+            if existing:
+                updates = []
+                params = []
+                if display_currency is not None:
+                    updates.append("display_currency = ?")
+                    params.append(display_currency)
+                if currency_rates is not None:
+                    updates.append("currency_rates_json = ?")
+                    params.append(json.dumps(currency_rates))
+                if updates:
+                    updates.append("updated_at = ?")
+                    params.append(now)
+                    params.append(user_id)
+                    conn.execute(
+                        f"UPDATE user_settings SET {', '.join(updates)} WHERE user_id = ?",
+                        params,
+                    )
+            else:
+                conn.execute(
+                    "INSERT INTO user_settings (user_id, display_currency, currency_rates_json, updated_at) VALUES (?, ?, ?, ?)",
+                    (
+                        user_id,
+                        display_currency or DEFAULT_CURRENCY,
+                        json.dumps(currency_rates or {}),
+                        now,
+                    ),
+                )
