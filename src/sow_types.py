@@ -20,14 +20,14 @@ SOW_TYPES: Dict[str, SOWType] = {
         key="savings",
         label="Savings Accounts",
         is_asset=True,
-        default_annual_growth=0.1,
+        default_annual_growth=0.05,
         default_monthly_contribution=0.0,
     ),
     "income": SOWType(
         key="income",
         label="Stable Income",
         is_asset=True,
-        default_annual_growth=0.04,
+        default_annual_growth=0.05,
         default_monthly_contribution=10000.0,
     ),
     "investment": SOWType(
