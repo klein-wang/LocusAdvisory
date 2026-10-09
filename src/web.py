@@ -328,6 +328,37 @@ def api_forecast():
         display_currency=display_currency,
         currency_rates=currency_rates,
     )
+
+    monthly_totals = result.get('monthly_totals', {})
+    sorted_months = sorted(monthly_totals.keys())
+    scenarios = [{'month': m, 'total_value': monthly_totals[m]} for m in sorted_months]
+    starting_value = monthly_totals[sorted_months[0]] if sorted_months else 0
+    final_value = monthly_totals[sorted_months[-1]] if sorted_months else 0
+    total_growth = (final_value - starting_value) / abs(starting_value) if starting_value else 0
+
+    breakdown = []
+    sow_pct = result.get('sow_percentage', {})
+    for m in sorted_months:
+        row = {}
+        for sow_name, pct_map in sow_pct.items():
+            row[sow_name] = round(pct_map.get(m, 0.0), 2)
+        breakdown.append(row)
+
+    result['scenarios'] = scenarios
+    result['starting_value'] = round(starting_value, 2)
+    result['final_value'] = round(final_value, 2)
+    result['total_growth'] = round(total_growth, 4)
+    result['forecast_breakdown'] = breakdown
+    result['stochastic'] = d.get('stochastic', False)
+
+    stoch_summary = result.get('stochastic_summary', {})
+    portfolio = stoch_summary.get('portfolio', {})
+    mc_end = portfolio.get('monte_carlo', {})
+    if mc_end:
+        result['confidence_5'] = round(mc_end.get('p5', 0), 2)
+        result['confidence_50'] = round(mc_end.get('p50', 0), 2)
+        result['confidence_95'] = round(mc_end.get('p95', 0), 2)
+
     return jsonify(result)
 
 
