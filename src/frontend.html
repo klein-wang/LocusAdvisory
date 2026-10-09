@@ -7,435 +7,210 @@
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
 <style>
   :root, [data-theme="light"] {
-    --bg: #f4f6fb;
-    --bg-elevated: #eef1f7;
-    --card: #ffffff;
-    --card-hover: #fafbfd;
-    --text: #111827;
-    --text-secondary: #374151;
-    --muted: #6b7280;
-    --border: #e5e7eb;
-    --border-strong: #d1d5db;
-    --accent: #1e40af;
-    --accent-hover: #1e3a8a;
-    --accent-subtle: #dbeafe;
+    --bg: #f4f6fb; --bg-elevated: #eef1f7; --card: #ffffff; --card-hover: #fafbfd;
+    --text: #111827; --text-secondary: #374151; --muted: #6b7280;
+    --border: #e5e7eb; --border-strong: #d1d5db;
+    --accent: #1e40af; --accent-hover: #1e3a8a; --accent-subtle: #dbeafe;
     --accent-glow: rgba(30, 64, 175, 0.15);
-    --pos: #059669;
-    --pos-subtle: #d1fae5;
-    --neg: #dc2626;
-    --neg-subtle: #fee2e2;
+    --pos: #059669; --pos-subtle: #d1fae5; --neg: #dc2626; --neg-subtle: #fee2e2;
     --shadow-sm: 0 1px 2px rgba(16, 24, 40, 0.04);
     --shadow-md: 0 4px 16px rgba(16, 24, 40, 0.06);
     --shadow-lg: 0 12px 32px rgba(16, 24, 40, 0.08);
-    --radius: 14px;
-    --radius-sm: 8px;
-    --chart-grid: #e5e7eb;
-    --chart-text: #6b7280;
+    --radius: 14px; --radius-sm: 8px;
+    --chart-grid: #e5e7eb; --chart-text: #6b7280;
   }
   [data-theme="dark"] {
-    --bg: #0b1120;
-    --bg-elevated: #111a2e;
-    --card: #131c33;
-    --card-hover: #1a2540;
-    --text: #f1f5f9;
-    --text-secondary: #cbd5e1;
-    --muted: #94a3b8;
-    --border: #1e2a48;
-    --border-strong: #2a3a5e;
-    --accent: #60a5fa;
-    --accent-hover: #93c5fd;
-    --accent-subtle: #1e3a5f;
+    --bg: #0b1120; --bg-elevated: #111a2e; --card: #131c33; --card-hover: #1a2540;
+    --text: #f1f5f9; --text-secondary: #cbd5e1; --muted: #94a3b8;
+    --border: #1e2a48; --border-strong: #2a3a5e;
+    --accent: #60a5fa; --accent-hover: #93c5fd; --accent-subtle: #1e3a5f;
     --accent-glow: rgba(96, 165, 250, 0.2);
-    --pos: #34d399;
-    --pos-subtle: rgba(52, 211, 153, 0.15);
-    --neg: #f87171;
-    --neg-subtle: rgba(248, 113, 113, 0.15);
+    --pos: #34d399; --pos-subtle: rgba(52, 211, 153, 0.15);
+    --neg: #f87171; --neg-subtle: rgba(248, 113, 113, 0.15);
     --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.3);
     --shadow-md: 0 4px 16px rgba(0, 0, 0, 0.35);
     --shadow-lg: 0 12px 32px rgba(0, 0, 0, 0.45);
-    --chart-grid: #1e2a48;
-    --chart-text: #94a3b8;
+    --chart-grid: #1e2a48; --chart-text: #94a3b8;
   }
-
   * { box-sizing: border-box; margin: 0; padding: 0; }
-
   html { font-size: 15px; }
-
   body {
-    font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', sans-serif;
-    background: var(--bg);
-    color: var(--text);
-    line-height: 1.5;
-    -webkit-font-smoothing: antialiased;
-    -moz-osx-font-smoothing: grayscale;
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    background: var(--bg); color: var(--text); line-height: 1.5;
+    -webkit-font-smoothing: antialiased; -moz-osx-font-smoothing: grayscale;
     transition: background-color 0.3s ease, color 0.3s ease;
   }
-
   .container { max-width: 1320px; margin: 0 auto; padding: 28px 32px; }
 
-  /* ===== Header ===== */
   .header {
-    background: var(--card);
-    border-radius: var(--radius);
-    padding: 24px 32px;
-    margin-bottom: 24px;
-    box-shadow: var(--shadow-sm);
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    border: 1px solid var(--border);
-    transition: background-color 0.3s ease, border-color 0.3s ease;
+    background: var(--card); border-radius: var(--radius); padding: 24px 32px; margin-bottom: 24px;
+    box-shadow: var(--shadow-sm); display: flex; justify-content: space-between; align-items: center;
+    border: 1px solid var(--border); transition: background-color 0.3s ease, border-color 0.3s ease;
   }
   .brand { display: flex; align-items: center; gap: 14px; }
-  .brand-logo {
-    width: 40px; height: 40px;
-    border-radius: 10px;
-    overflow: hidden;
-    box-shadow: 0 4px 12px var(--accent-glow);
-  }
+  .brand-logo { width: 40px; height: 40px; border-radius: 10px; overflow: hidden; box-shadow: 0 4px 12px var(--accent-glow); }
   .brand-logo img { width: 100%; height: 100%; object-fit: cover; display: block; }
-  .brand-text h1 {
-    font-size: 17px;
-    font-weight: 700;
-    letter-spacing: -0.01em;
-  }
-  .brand-text .subtitle {
-    color: var(--muted);
-    font-size: 12px;
-    margin-top: 2px;
-  }
+  .brand-text h1 { font-size: 17px; font-weight: 700; letter-spacing: -0.01em; }
+  .brand-text .subtitle { color: var(--muted); font-size: 12px; margin-top: 2px; }
   .header-actions { display: flex; align-items: center; gap: 12px; }
   .theme-toggle {
-    width: 40px; height: 40px;
-    border-radius: 10px;
-    border: 1px solid var(--border);
-    background: var(--card);
-    color: var(--muted);
-    cursor: pointer;
-    display: flex; align-items: center; justify-content: center;
-    transition: all 0.2s ease;
-    font-size: 18px;
+    width: 40px; height: 40px; border-radius: 10px; border: 1px solid var(--border); background: var(--card);
+    color: var(--muted); cursor: pointer; display: flex; align-items: center; justify-content: center;
+    transition: all 0.2s ease; font-size: 18px;
   }
-  .theme-toggle:hover {
-    background: var(--bg-elevated);
-    color: var(--accent);
-    border-color: var(--border-strong);
-  }
+  .theme-toggle:hover { background: var(--bg-elevated); color: var(--accent); border-color: var(--border-strong); }
   .theme-toggle .icon-sun, .theme-toggle .icon-moon { display: none; }
   [data-theme="light"] .theme-toggle .icon-moon { display: inline; }
   [data-theme="dark"] .theme-toggle .icon-sun { display: inline; }
   .user-info { display: flex; align-items: center; gap: 10px; }
-  .user-info .username {
-    font-weight: 600;
-    font-size: 13px;
-    padding: 6px 14px;
-    background: var(--accent-subtle);
-    color: var(--accent);
-    border-radius: 20px;
-  }
+  .user-info .username { font-weight: 600; font-size: 13px; padding: 6px 14px; background: var(--accent-subtle); color: var(--accent); border-radius: 20px; }
 
-  /* ===== Cards ===== */
   .card {
-    background: var(--card);
-    border-radius: var(--radius);
-    padding: 28px 30px;
-    margin-bottom: 24px;
-    box-shadow: var(--shadow-sm);
-    border: 1px solid var(--border);
+    background: var(--card); border-radius: var(--radius); padding: 28px 30px; margin-bottom: 24px;
+    box-shadow: var(--shadow-sm); border: 1px solid var(--border);
     transition: background-color 0.3s ease, border-color 0.3s ease, box-shadow 0.3s ease;
   }
-  .card h2 {
-    margin: 0 0 20px 0;
-    font-size: 15px;
-    font-weight: 600;
-    letter-spacing: -0.005em;
-    color: var(--text);
-  }
+  .card h2 { margin: 0 0 20px 0; font-size: 15px; font-weight: 600; letter-spacing: -0.005em; color: var(--text); }
   .card h3 { font-size: 14px; font-weight: 600; margin-bottom: 12px; color: var(--text-secondary); }
 
-  /* ===== Tabs ===== */
   .tabs {
-    display: flex; gap: 4px;
-    margin-bottom: 24px;
-    background: var(--card);
-    padding: 6px;
-    border-radius: 12px;
-    border: 1px solid var(--border);
-    box-shadow: var(--shadow-sm);
-    width: fit-content;
+    display: flex; gap: 4px; flex-wrap: wrap; margin-bottom: 24px;
+    background: var(--card); padding: 6px; border-radius: 12px; border: 1px solid var(--border);
+    box-shadow: var(--shadow-sm); width: fit-content;
   }
   .tab {
-    padding: 10px 20px;
-    border-radius: 8px;
-    cursor: pointer;
-    background: transparent;
-    font-size: 13px;
-    font-weight: 500;
-    border: none;
-    color: var(--muted);
-    transition: all 0.2s ease;
+    padding: 10px 20px; border-radius: 8px; cursor: pointer; background: transparent; font-size: 13px;
+    font-weight: 500; border: none; color: var(--muted); transition: all 0.2s ease;
   }
   .tab:hover { color: var(--text); background: var(--bg-elevated); }
-  .tab.active {
-    background: var(--accent);
-    color: #fff;
-    box-shadow: 0 2px 8px var(--accent-glow);
-  }
+  .tab.active { background: var(--accent); color: #fff; box-shadow: 0 2px 8px var(--accent-glow); }
   .tab-content { display: none; animation: fadeIn 0.25s ease; }
   .tab-content.active { display: block; }
+  @keyframes fadeIn { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: translateY(0); } }
 
-  @keyframes fadeIn {
-    from { opacity: 0; transform: translateY(4px); }
-    to { opacity: 1; transform: translateY(0); }
-  }
-
-  /* ===== Buttons ===== */
   .btn {
-    padding: 10px 20px;
-    border-radius: 10px;
-    border: none;
-    cursor: pointer;
-    font-size: 13px;
-    font-weight: 600;
-    letter-spacing: 0.01em;
-    transition: all 0.2s ease;
+    padding: 10px 20px; border-radius: 10px; border: none; cursor: pointer; font-size: 13px;
+    font-weight: 600; letter-spacing: 0.01em; transition: all 0.2s ease;
     display: inline-flex; align-items: center; gap: 6px;
   }
-  .btn-primary {
-    background: var(--accent);
-    color: #fff;
-    box-shadow: 0 2px 6px var(--accent-glow);
-  }
+  .btn-primary { background: var(--accent); color: #fff; box-shadow: 0 2px 6px var(--accent-glow); }
   .btn-primary:hover { background: var(--accent-hover); transform: translateY(-1px); box-shadow: 0 4px 12px var(--accent-glow); }
   .btn-primary:active { transform: translateY(0); }
-  .btn-danger {
-    background: var(--neg);
-    color: #fff;
-    box-shadow: 0 2px 6px rgba(220, 38, 38, 0.15);
-  }
+  .btn-primary:disabled { opacity: 0.6; cursor: not-allowed; transform: none; }
+  .btn-danger { background: var(--neg); color: #fff; box-shadow: 0 2px 6px rgba(220, 38, 38, 0.15); }
   .btn-danger:hover { opacity: 0.9; transform: translateY(-1px); }
-  .btn-secondary {
-    background: var(--bg-elevated);
-    color: var(--text-secondary);
-    border: 1px solid var(--border);
-  }
+  .btn-secondary { background: var(--bg-elevated); color: var(--text-secondary); border: 1px solid var(--border); }
   .btn-secondary:hover { background: var(--card-hover); border-color: var(--border-strong); }
   .btn-sm { padding: 6px 12px; font-size: 12px; border-radius: 7px; }
 
-  /* ===== Tables ===== */
   table { width: 100%; border-collapse: separate; border-spacing: 0; }
-  th, td {
-    padding: 14px 16px;
-    text-align: right;
-    font-size: 13px;
-    border-bottom: 1px solid var(--border);
-  }
+  th, td { padding: 14px 16px; text-align: right; font-size: 13px; border-bottom: 1px solid var(--border); }
   th:first-child, td:first-child { text-align: left; }
-  th {
-    font-weight: 600;
-    color: var(--muted);
-    font-size: 11px;
-    text-transform: uppercase;
-    letter-spacing: 0.8px;
-    background: transparent;
-    border-bottom: 1px solid var(--border-strong);
-    position: sticky; top: 0;
-  }
+  th { font-weight: 600; color: var(--muted); font-size: 11px; text-transform: uppercase; letter-spacing: 0.8px; background: transparent; border-bottom: 1px solid var(--border-strong); position: sticky; top: 0; }
   tbody tr { transition: background-color 0.15s ease; }
   tbody tr:hover { background: var(--card-hover); }
   tbody tr:last-child td { border-bottom: none; }
 
-  /* ===== Forms ===== */
-  input, select {
-    padding: 10px 14px;
-    border: 1px solid var(--border);
-    border-radius: 8px;
-    font-size: 13px;
-    width: 100%;
-    background: var(--card);
-    color: var(--text);
-    transition: border-color 0.2s ease, box-shadow 0.2s ease;
+  input, select, textarea {
+    padding: 10px 14px; border: 1px solid var(--border); border-radius: 8px; font-size: 13px;
+    width: 100%; background: var(--card); color: var(--text); transition: border-color 0.2s ease, box-shadow 0.2s ease;
     font-family: inherit;
   }
-  input:focus, select:focus {
-    outline: none;
-    border-color: var(--accent);
-    box-shadow: 0 0 0 3px var(--accent-glow);
-  }
+  textarea { resize: vertical; min-height: 100px; }
+  input:focus, select:focus, textarea:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-glow); }
   .form-row { display: grid; grid-template-columns: 180px 1fr auto; gap: 12px; margin-bottom: 10px; align-items: center; }
   .form-row label { font-size: 13px; color: var(--muted); font-weight: 500; }
   .form-row-simple { margin-bottom: 16px; }
   .form-row-simple label { display: block; font-size: 13px; color: var(--muted); margin-bottom: 6px; font-weight: 500; }
+  .inline-code-btn { display: grid; grid-template-columns: 1fr auto; gap: 8px; align-items: center; }
+  .inline-code-btn .btn { white-space: nowrap; }
 
-  /* ===== Modal ===== */
-  .modal-overlay {
-    display: none;
-    position: fixed; top: 0; left: 0;
-    width: 100%; height: 100%;
-    background: rgba(0,0,0,0.5);
-    backdrop-filter: blur(4px);
-    z-index: 1000;
-    align-items: center; justify-content: center;
-    animation: fadeIn 0.2s ease;
-  }
+  .modal-overlay { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); backdrop-filter: blur(4px); z-index: 1000; align-items: center; justify-content: center; animation: fadeIn 0.2s ease; }
   .modal-overlay.active { display: flex; }
-  .modal {
-    background: var(--card);
-    border-radius: var(--radius);
-    padding: 28px;
-    max-width: 480px;
-    width: 90%;
-    box-shadow: var(--shadow-lg);
-    border: 1px solid var(--border);
-    animation: modalIn 0.25s ease;
-  }
-  @keyframes modalIn {
-    from { opacity: 0; transform: scale(0.95); }
-    to { opacity: 1; transform: scale(1); }
-  }
+  .modal { background: var(--card); border-radius: var(--radius); padding: 28px; max-width: 480px; width: 90%; box-shadow: var(--shadow-lg); border: 1px solid var(--border); animation: modalIn 0.25s ease; }
+  @keyframes modalIn { from { opacity: 0; transform: scale(0.95); } to { opacity: 1; transform: scale(1); } }
   .modal h3 { margin-bottom: 20px; font-size: 16px; font-weight: 700; }
 
-  /* ===== KPI ===== */
-  .kpi-row {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
-    gap: 18px;
-    margin-bottom: 24px;
-  }
-  .kpi {
-    background: var(--card);
-    border-radius: var(--radius);
-    padding: 22px 24px;
-    border: 1px solid var(--border);
-    position: relative;
-    overflow: hidden;
-    transition: transform 0.2s ease, box-shadow 0.2s ease, border-color 0.3s ease, background-color 0.3s ease;
-  }
+  .kpi-row { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 18px; margin-bottom: 24px; }
+  .kpi { background: var(--card); border-radius: var(--radius); padding: 22px 24px; border: 1px solid var(--border); position: relative; overflow: hidden; transition: transform 0.2s ease, box-shadow 0.2s ease, border-color 0.3s ease, background-color 0.3s ease; }
   .kpi:hover { transform: translateY(-2px); box-shadow: var(--shadow-md); border-color: var(--border-strong); }
-  .kpi::before {
-    content: '';
-    position: absolute; top: 0; left: 0; right: 0; height: 3px;
-    background: linear-gradient(90deg, var(--accent), var(--accent-hover));
-    opacity: 0.9;
-  }
-  .kpi .label {
-    font-size: 11px;
-    color: var(--muted);
-    text-transform: uppercase;
-    letter-spacing: 0.8px;
-    font-weight: 600;
-    margin-bottom: 10px;
-  }
-  .kpi .value {
-    font-size: 28px;
-    font-weight: 700;
-    letter-spacing: -0.02em;
-    font-variant-numeric: tabular-nums;
-  }
-  .kpi .sub {
-    font-size: 12px;
-    color: var(--muted);
-    margin-top: 6px;
-  }
+  .kpi::before { content: ''; position: absolute; top: 0; left: 0; right: 0; height: 3px; background: linear-gradient(90deg, var(--accent), var(--accent-hover)); opacity: 0.9; }
+  .kpi .label { font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.8px; font-weight: 600; margin-bottom: 10px; }
+  .kpi .value { font-size: 28px; font-weight: 700; letter-spacing: -0.02em; font-variant-numeric: tabular-nums; }
+  .kpi .sub { font-size: 12px; color: var(--muted); margin-top: 6px; }
 
-  /* ===== Charts ===== */
   .chart-wrap { position: relative; height: 420px; }
   .chart-row { display: grid; grid-template-columns: 1fr 360px; gap: 24px; margin-bottom: 24px; }
   @media (max-width: 900px) { .chart-row { grid-template-columns: 1fr; } }
-
   .hidden { display: none !important; }
 
-  /* ===== Flash ===== */
-  .flash {
-    padding: 14px 18px;
-    border-radius: var(--radius-sm);
-    margin-bottom: 16px;
-    font-size: 13px;
-    font-weight: 500;
-    border: 1px solid transparent;
-    animation: slideDown 0.3s ease;
-  }
-  @keyframes slideDown {
-    from { opacity: 0; transform: translateY(-10px); }
-    to { opacity: 1; transform: translateY(0); }
-  }
+  .flash { padding: 14px 18px; border-radius: var(--radius-sm); margin-bottom: 16px; font-size: 13px; font-weight: 500; border: 1px solid transparent; animation: slideDown 0.3s ease; }
+  @keyframes slideDown { from { opacity: 0; transform: translateY(-10px); } to { opacity: 1; transform: translateY(0); } }
   .flash-success { background: var(--pos-subtle); color: var(--pos); border-color: var(--pos); }
   .flash-error { background: var(--neg-subtle); color: var(--neg); border-color: var(--neg); }
 
-  /* ===== Asset editor ===== */
   .asset-row { cursor: pointer; }
   .asset-row:hover { background: var(--card-hover); }
-  .mv-editor {
-    padding: 18px 20px;
-    background: var(--bg-elevated);
-    border-radius: 10px;
-    margin-top: 8px;
-    border: 1px solid var(--border);
-  }
-  .mv-row {
-    display: grid;
-    grid-template-columns: 120px 1fr auto;
-    gap: 10px;
-    margin-bottom: 8px;
-    align-items: center;
-  }
+  .mv-editor { padding: 18px 20px; background: var(--bg-elevated); border-radius: 10px; margin-top: 8px; border: 1px solid var(--border); }
+  .mv-row { display: grid; grid-template-columns: 120px 1fr auto; gap: 10px; margin-bottom: 8px; align-items: center; }
 
-  /* ===== Auth ===== */
   .auth-wrapper { display: flex; justify-content: center; align-items: center; min-height: 80vh; }
-  .auth-card {
-    background: var(--card);
-    border-radius: var(--radius);
-    padding: 44px 40px;
-    box-shadow: var(--shadow-lg);
-    width: 420px;
-    border: 1px solid var(--border);
-  }
-  .auth-logo {
-    width: 52px; height: 52px;
-    border-radius: 14px;
-    overflow: hidden;
-    margin: 0 auto 20px;
-    box-shadow: 0 6px 20px var(--accent-glow);
-  }
+  .auth-card { background: var(--card); border-radius: var(--radius); padding: 44px 40px; box-shadow: var(--shadow-lg); width: 440px; border: 1px solid var(--border); }
+  .auth-logo { width: 52px; height: 52px; border-radius: 14px; overflow: hidden; margin: 0 auto 20px; box-shadow: 0 6px 20px var(--accent-glow); }
   .auth-logo img { width: 100%; height: 100%; object-fit: cover; display: block; }
-  .auth-card h2 {
-    text-align: center;
-    margin-bottom: 6px;
-    font-size: 20px;
-    font-weight: 700;
-  }
-  .auth-card .auth-sub {
-    text-align: center;
-    color: var(--muted);
-    font-size: 13px;
-    margin-bottom: 24px;
-  }
+  .auth-card h2 { text-align: center; margin-bottom: 6px; font-size: 20px; font-weight: 700; }
+  .auth-card .auth-sub { text-align: center; color: var(--muted); font-size: 13px; margin-bottom: 24px; }
   .auth-card button { width: 100%; margin-top: 8px; padding: 12px 20px; font-size: 14px; }
   .auth-card .switch-link { text-align: center; margin-top: 20px; font-size: 13px; color: var(--muted); }
   .auth-card .switch-link a { color: var(--accent); cursor: pointer; font-weight: 500; }
   .auth-card .switch-link a:hover { text-decoration: underline; }
+  .auth-card .forgot-link { text-align: right; margin-top: -4px; margin-bottom: 12px; }
+  .auth-card .forgot-link a { color: var(--muted); cursor: pointer; font-size: 12px; text-decoration: none; }
+  .auth-card .forgot-link a:hover { color: var(--accent); text-decoration: underline; }
+  .auth-dev-code { background: var(--accent-subtle); border: 1px dashed var(--accent); border-radius: var(--radius-sm); padding: 10px 14px; font-size: 13px; color: var(--accent); margin-top: 12px; text-align: center; }
+  .auth-error { background: #fef2f2; border: 1px solid #fecaca; color: #dc2626; border-radius: 10px; padding: 10px 14px; font-size: 13px; margin-bottom: 16px; display: flex; align-items: center; gap: 8px; }
+  [data-theme="dark"] .auth-error { background: rgba(220, 38, 38, 0.12); border-color: rgba(220, 38, 38, 0.35); color: #f87171; }
+  .auth-error::before { content: '\26A0'; font-size: 16px; flex-shrink: 0; }
 
-  /* ===== Pos/Neg colors ===== */
   .pos { color: var(--pos); }
   .neg { color: var(--neg); }
-  th.pos, td.pos { color: var(--pos); }
-  th.neg, td.neg { color: var(--neg); }
 
-  /* ===== Section label ===== */
-  .section-label {
-    display: inline-block;
-    background: var(--accent-subtle);
-    color: var(--accent);
-    padding: 3px 10px;
-    border-radius: 20px;
-    font-size: 11px;
-    font-weight: 600;
-    margin-left: 8px;
-    vertical-align: middle;
-    letter-spacing: 0.3px;
+  .welcome-hero {
+    background: linear-gradient(135deg, var(--accent) 0%, #3b82f6 100%);
+    color: #fff; border-radius: var(--radius); padding: 40px; margin-bottom: 24px;
+    box-shadow: 0 8px 32px var(--accent-glow); position: relative; overflow: hidden;
   }
+  .welcome-hero::before { content: ''; position: absolute; top: -50%; right: -20%; width: 500px; height: 500px; background: radial-gradient(circle, rgba(255,255,255,0.1) 0%, transparent 70%); border-radius: 50%; }
+  .welcome-hero h1 { font-size: 28px; font-weight: 700; margin-bottom: 8px; letter-spacing: -0.02em; }
+  .welcome-hero p { font-size: 15px; opacity: 0.92; margin-bottom: 24px; max-width: 560px; }
+  .welcome-hero .cta-row { display: flex; gap: 12px; flex-wrap: wrap; position: relative; z-index: 1; }
+  .welcome-hero .btn-primary-hero { background: #fff; color: var(--accent); padding: 12px 24px; border-radius: 10px; font-weight: 600; font-size: 13px; border: none; cursor: pointer; box-shadow: 0 2px 8px rgba(0,0,0,0.15); transition: all 0.2s ease; }
+  .welcome-hero .btn-primary-hero:hover { transform: translateY(-1px); box-shadow: 0 4px 14px rgba(0,0,0,0.2); }
+  .welcome-hero .btn-secondary-hero { background: rgba(255,255,255,0.15); color: #fff; padding: 12px 24px; border-radius: 10px; font-weight: 600; font-size: 13px; border: 1px solid rgba(255,255,255,0.3); cursor: pointer; transition: all 0.2s ease; }
+  .welcome-hero .btn-secondary-hero:hover { background: rgba(255,255,255,0.25); }
 
-  /* ===== Responsive ===== */
+  .guide-section { margin-bottom: 24px; }
+  .guide-section h2 { font-size: 18px; font-weight: 700; margin-bottom: 20px; }
+  .guide-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 18px; }
+  .guide-card { background: var(--card); border: 1px solid var(--border); border-radius: var(--radius); padding: 24px; transition: all 0.25s ease; cursor: pointer; }
+  .guide-card:hover { transform: translateY(-3px); box-shadow: var(--shadow-md); border-color: var(--border-strong); }
+  .guide-card .step-num { display: inline-flex; align-items: center; justify-content: center; width: 36px; height: 36px; border-radius: 50%; background: var(--accent-subtle); color: var(--accent); font-weight: 700; font-size: 14px; margin-bottom: 14px; }
+  .guide-card h3 { font-size: 15px; font-weight: 700; margin-bottom: 8px; color: var(--text); }
+  .guide-card p { font-size: 13px; color: var(--muted); line-height: 1.55; margin-bottom: 12px; }
+  .guide-card .learn-more { font-size: 12px; color: var(--accent); font-weight: 600; }
+
+  .stats-row { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 14px; margin-bottom: 24px; }
+  .stat-box { background: var(--card); border: 1px solid var(--border); border-radius: var(--radius-sm); padding: 18px 20px; text-align: center; }
+  .stat-box .stat-val { font-size: 24px; font-weight: 700; color: var(--accent); }
+  .stat-box .stat-label { font-size: 12px; color: var(--muted); margin-top: 4px; }
+
+  .feedback-section { background: var(--card); border-radius: var(--radius); padding: 28px 30px; border: 1px solid var(--border); }
+  .feedback-section h2 { font-size: 18px; font-weight: 700; margin-bottom: 8px; }
+  .feedback-section .feedback-sub { color: var(--muted); font-size: 13px; margin-bottom: 20px; }
+  .rating-stars { display: flex; gap: 8px; margin-bottom: 16px; }
+  .rating-star { width: 36px; height: 36px; cursor: pointer; font-size: 26px; color: var(--border-strong); transition: all 0.15s ease; display: flex; align-items: center; justify-content: center; }
+  .rating-star.active, .rating-star:hover { color: #f59e0b; }
+
   @media (max-width: 768px) {
     .container { padding: 16px; }
     .header { flex-direction: column; gap: 16px; align-items: flex-start; padding: 20px; }
@@ -443,6 +218,10 @@
     .card { padding: 20px; }
     .kpi .value { font-size: 24px; }
     .tabs { width: 100%; overflow-x: auto; }
+    .auth-card { padding: 32px 24px; width: 100%; max-width: 420px; }
+    .welcome-hero { padding: 28px; }
+    .welcome-hero h1 { font-size: 22px; }
+    .guide-grid { grid-template-columns: 1fr; }
   }
 </style>
 </head>
@@ -452,24 +231,74 @@
   <div id="authView" class="auth-wrapper">
     <div class="auth-card">
       <div class="auth-logo"><img src="/static/logo.jpg" alt="LocusAdvisory"></div>
-      <h2 id="authTitle">Sign in</h2>
-      <div class="auth-sub">Welcome back to LocusAdvisory</div>
-      <div id="authMode" data-mode="login"></div>
-      <div class="form-row-simple">
-        <label>Username</label>
-        <input id="authUsername" placeholder="Username or Email" autocomplete="username">
+
+      <div id="authLogin">
+        <h2>Sign in</h2>
+        <div class="auth-sub">Welcome back to LocusAdvisory</div>
+        <div id="authLoginError" class="auth-error hidden"></div>
+        <div class="form-row-simple">
+          <label>Username or Email</label>
+          <input id="loginIdentifier" placeholder="Enter your username or email" autocomplete="username">
+        </div>
+        <div class="form-row-simple">
+          <label>Password</label>
+          <input id="loginPassword" type="password" autocomplete="current-password">
+        </div>
+        <div class="forgot-link"><a onclick="showAuthView('forgot')">Forgot your password?</a></div>
+        <button class="btn btn-primary" onclick="doLogin()">Sign In</button>
+        <div class="switch-link">New here? <a onclick="showAuthView('register')">Create an account</a></div>
       </div>
-      <div class="form-row-simple">
-        <label>Email <span class="hidden" id="emailLabel">(required for signup)</span></label>
-        <input id="authEmail" type="email" autocomplete="email">
+
+      <div id="authRegister" class="hidden">
+        <h2>Create your account</h2>
+        <div class="auth-sub">Start managing your wealth in minutes</div>
+        <div id="authRegisterError" class="auth-error hidden"></div>
+        <div class="form-row-simple">
+          <label>Username</label>
+          <input id="regUsername" placeholder="3-30 chars, letters/numbers/_" autocomplete="username">
+        </div>
+        <div class="form-row-simple">
+          <label>Email</label>
+          <input id="regEmail" type="email" placeholder="you@example.com" autocomplete="email">
+        </div>
+        <div class="form-row-simple">
+          <label>Password</label>
+          <input id="regPassword" type="password" placeholder="At least 6 characters" autocomplete="new-password">
+        </div>
+        <div class="form-row-simple">
+          <label>Email Verification Code</label>
+          <div class="inline-code-btn">
+            <input id="regCode" placeholder="6-digit code from email" maxlength="6">
+            <button class="btn btn-secondary btn-sm" id="regSendCodeBtn" onclick="sendVerifyCode('register')">Send Code</button>
+          </div>
+          <div id="regDevCode" class="auth-dev-code hidden"></div>
+        </div>
+        <button class="btn btn-primary" onclick="doRegister()">Create Account</button>
+        <div class="switch-link">Already have an account? <a onclick="showAuthView('login')">Sign in</a></div>
       </div>
-      <div class="form-row-simple">
-        <label>Password</label>
-        <input id="authPassword" type="password" autocomplete="current-password">
-      </div>
-      <button class="btn btn-primary" onclick="submitAuth()" id="authSubmitBtn">Sign In</button>
-      <div class="switch-link" id="switchLink">
-        New here? <a onclick="toggleAuthMode()">Create an account</a>
+
+      <div id="authForgot" class="hidden">
+        <h2>Reset your password</h2>
+        <div class="auth-sub">We'll email you a verification code</div>
+        <div id="authForgotError" class="auth-error hidden"></div>
+        <div class="form-row-simple">
+          <label>Email</label>
+          <input id="forgotEmail" type="email" placeholder="your-registered@email.com" autocomplete="email">
+        </div>
+        <div class="form-row-simple">
+          <label>Verification Code</label>
+          <div class="inline-code-btn">
+            <input id="forgotCode" placeholder="6-digit code from email" maxlength="6">
+            <button class="btn btn-secondary btn-sm" id="forgotSendCodeBtn" onclick="sendVerifyCode('reset')">Send Code</button>
+          </div>
+          <div id="forgotDevCode" class="auth-dev-code hidden"></div>
+        </div>
+        <div class="form-row-simple">
+          <label>New Password</label>
+          <input id="forgotNewPassword" type="password" placeholder="At least 6 characters" autocomplete="new-password">
+        </div>
+        <button class="btn btn-primary" onclick="doResetPassword()">Reset Password</button>
+        <div class="switch-link">Remember it? <a onclick="showAuthView('login')">Sign in</a></div>
       </div>
     </div>
   </div>
@@ -498,13 +327,92 @@
     <div id="flash"></div>
 
     <div class="tabs">
-      <button class="tab active" onclick="switchTab(event, 'assets')">Assets</button>
+      <button class="tab active" onclick="switchTab(event, 'welcome')">Welcome</button>
+      <button class="tab" onclick="switchTab(event, 'assets')">Assets</button>
       <button class="tab" onclick="switchTab(event, 'forecast')">Forecast</button>
       <button class="tab" onclick="switchTab(event, 'import')">Import Data</button>
       <button class="tab" onclick="switchTab(event, 'settings')">Settings</button>
     </div>
 
-    <div id="assets" class="tab-content active">
+    <div id="welcome" class="tab-content active">
+      <div class="welcome-hero">
+        <h1>Welcome, <span id="welcomeName"></span>!</h1>
+        <p>Your personal wealth management hub. Track your Statement of Wealth (SOW), run forecasts, and take control of your financial future.</p>
+        <div class="cta-row">
+          <button class="btn-primary-hero" onclick="switchTabDirect('assets')">Get Started →</button>
+          <button class="btn-secondary-hero" onclick="switchTabDirect('forecast')">Run a Forecast</button>
+        </div>
+      </div>
+
+      <div id="welcomeStats" class="stats-row"></div>
+
+      <div class="guide-section">
+        <h2>How to use LocusAdvisory</h2>
+        <div class="guide-grid">
+          <div class="guide-card" onclick="switchTabDirect('import')">
+            <div class="step-num">1</div>
+            <h3>Import your SOW data</h3>
+            <p>Upload an Excel file with your Statement of Wealth, or click "Import Sample HKD Assets" to try it instantly.</p>
+            <div class="learn-more">Go to Import →</div>
+          </div>
+          <div class="guide-card" onclick="switchTabDirect('assets')">
+            <div class="step-num">2</div>
+            <h3>Review & maintain assets</h3>
+            <p>Assets are organized by SOW Type. Add monthly market values, edit details, or remove items as your portfolio changes.</p>
+            <div class="learn-more">Go to Assets →</div>
+          </div>
+          <div class="guide-card" onclick="switchTabDirect('settings')">
+            <div class="step-num">3</div>
+            <h3>Customize your settings</h3>
+            <p>Adjust forecast growth rates, monthly contributions, stochastic ranges, and choose your display currency.</p>
+            <div class="learn-more">Go to Settings →</div>
+          </div>
+          <div class="guide-card" onclick="switchTabDirect('forecast')">
+            <div class="step-num">4</div>
+            <h3>Run forecast & view dashboard</h3>
+            <p>Generate forward-looking projections with Monte Carlo simulations and understand your wealth trajectory.</p>
+            <div class="learn-more">Go to Forecast →</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="feedback-section">
+        <h2>Share your feedback</h2>
+        <div class="feedback-sub">How's your experience? We'd love to hear what's working and what we can improve.</div>
+        <div id="feedbackForm">
+          <div class="form-row-simple">
+            <label>Your Name (optional)</label>
+            <input id="fbName" placeholder="Displayed with your feedback" value="">
+          </div>
+          <div class="form-row-simple">
+            <label>Your Email</label>
+            <input id="fbEmail" type="email" placeholder="you@example.com" value="">
+          </div>
+          <div class="form-row-simple">
+            <label>Rating</label>
+            <div class="rating-stars" id="ratingStars">
+              <span class="rating-star" data-rating="1">★</span>
+              <span class="rating-star" data-rating="2">★</span>
+              <span class="rating-star" data-rating="3">★</span>
+              <span class="rating-star" data-rating="4">★</span>
+              <span class="rating-star" data-rating="5">★</span>
+            </div>
+          </div>
+          <div class="form-row-simple">
+            <label>Your Feedback</label>
+            <textarea id="fbMessage" placeholder="Tell us what you think, what features you'd like, or any bugs you found..." rows="4"></textarea>
+          </div>
+          <button class="btn btn-primary" onclick="submitFeedback()">Send Feedback</button>
+        </div>
+        <div id="feedbackSuccess" class="hidden" style="text-align: center; padding: 20px;">
+          <div style="font-size: 48px; margin-bottom: 12px;">✓</div>
+          <h3 style="color: var(--pos); margin-bottom: 8px;">Thank you for your feedback!</h3>
+          <p style="color: var(--muted); font-size: 14px;">We appreciate you taking the time to help us improve LocusAdvisory.</p>
+        </div>
+      </div>
+    </div>
+
+    <div id="assets" class="tab-content">
       <div class="card">
         <h2>Asset Management</h2>
         <button class="btn btn-primary" onclick="showAddAssetModal()" style="margin-bottom: 20px;">+ Add Asset</button>
@@ -599,9 +507,7 @@
     <div id="settings" class="tab-content">
       <div class="card" style="margin-bottom: 20px;">
         <h2>Currency Settings</h2>
-        <p style="color: var(--muted); margin-bottom: 20px;">
-          Choose your default display currency and update exchange rates. All rates are relative to USD (base = 1).
-        </p>
+        <p style="color: var(--muted); margin-bottom: 20px;">Choose your default display currency and update exchange rates. All rates are relative to USD (base = 1).</p>
         <div class="form-row" style="margin-bottom: 18px;">
           <label>Display Currency</label>
           <select id="displayCurrencySelect"></select>
@@ -615,9 +521,7 @@
       </div>
       <div class="card">
         <h2>Forecast Settings</h2>
-        <p style="color: var(--muted); margin-bottom: 20px;">
-          These are your personal defaults used when running forecasts. Leave a field empty to use the built-in default.
-        </p>
+        <p style="color: var(--muted); margin-bottom: 20px;">These are your personal defaults used when running forecasts. Leave a field empty to use the built-in default.</p>
         <div id="settingsTable" style="overflow-x: auto;"></div>
         <div style="margin-top: 20px; display: flex; gap: 10px;">
           <button class="btn btn-primary" onclick="saveSettings()">Save Changes</button>
@@ -653,12 +557,14 @@
     </div>
   </div>
 </div>
-
 <script>
 let currentUserId = null;
 let editingAssetId = null;
 let charts = {};
 let currentUser = null;
+let authCooldown = {};
+let currentRating = 0;
+let currenciesList = null;
 
 function getComputedThemeVars() {
   const cs = getComputedStyle(document.documentElement);
@@ -672,8 +578,7 @@ function getComputedThemeVars() {
 
 function toggleTheme() {
   const html = document.documentElement;
-  const current = html.getAttribute('data-theme');
-  const next = current === 'dark' ? 'light' : 'dark';
+  const next = html.getAttribute('data-theme') === 'dark' ? 'light' : 'dark';
   html.setAttribute('data-theme', next);
   localStorage.setItem('locus-theme', next);
   updateChartsTheme();
@@ -682,8 +587,7 @@ function toggleTheme() {
 function initTheme() {
   const saved = localStorage.getItem('locus-theme');
   const prefersDark = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
-  const theme = saved || (prefersDark ? 'dark' : 'light');
-  document.documentElement.setAttribute('data-theme', theme);
+  document.documentElement.setAttribute('data-theme', saved || (prefersDark ? 'dark' : 'light'));
 }
 
 function updateChartsTheme() {
@@ -706,29 +610,23 @@ function updateChartsTheme() {
 }
 
 async function api(method, path, data) {
-  const opts = { method, headers: { 'Content-Type': 'application/json' }, credentials: 'same-origin' };
+  const opts = { method: method, headers: { 'Content-Type': 'application/json' }, credentials: 'same-origin' };
   if (data) opts.body = JSON.stringify(data);
   const res = await fetch(path, opts);
   const json = await res.json();
   if (res.status === 401) {
-    currentUser = null;
-    currentUserId = null;
-    showAuthView();
-    throw new Error(json.error || 'Unauthorized');
+    currentUser = null; currentUserId = null; showAuthView('login'); throw new Error(json.error || 'Unauthorized');
   }
   if (!res.ok) throw new Error(json.error || 'Request failed');
   return json;
 }
 
 async function apiForm(method, path, formData) {
-  const opts = { method, body: formData, credentials: 'same-origin' };
+  const opts = { method: method, body: formData, credentials: 'same-origin' };
   const res = await fetch(path, opts);
   const json = await res.json();
   if (res.status === 401) {
-    currentUser = null;
-    currentUserId = null;
-    showAuthView();
-    throw new Error(json.error || 'Unauthorized');
+    currentUser = null; currentUserId = null; showAuthView('login'); throw new Error(json.error || 'Unauthorized');
   }
   if (!res.ok) throw new Error(json.error || 'Request failed');
   return json;
@@ -747,87 +645,183 @@ function switchTab(e, tabId) {
   e.target.classList.add('active');
   document.getElementById(tabId).classList.add('active');
   if (tabId === 'settings') { loadSettings(); loadCurrencySettings(); }
+  if (tabId === 'welcome') renderWelcomeStats();
+}
+
+function switchTabDirect(tabId) {
+  const tabs = document.querySelectorAll('.tab');
+  tabs.forEach(function(t) {
+    if (t.getAttribute('onclick') && t.getAttribute('onclick').indexOf("'" + tabId + "'") !== -1) {
+      tabs.forEach(function(x) { x.classList.remove('active'); });
+      t.classList.add('active');
+    }
+  });
+  document.querySelectorAll('.tab-content').forEach(function(c) { c.classList.remove('active'); });
+  document.getElementById(tabId).classList.add('active');
+  if (tabId === 'settings') { loadSettings(); loadCurrencySettings(); }
+  if (tabId === 'welcome') renderWelcomeStats();
 }
 
 function showModal(id) { document.getElementById(id).classList.add('active'); }
 function hideModal(id) { document.getElementById(id).classList.remove('active'); }
 
-function toggleAuthMode() {
-  const mode = document.getElementById('authMode').dataset.mode;
-  if (mode === 'login') {
-    document.getElementById('authMode').dataset.mode = 'signup';
-    document.getElementById('authTitle').textContent = 'Create your account';
-    document.querySelector('.auth-sub').textContent = 'Get started with LocusAdvisory';
-    document.getElementById('authSubmitBtn').textContent = 'Create Account';
-    document.getElementById('authEmail').parentElement.classList.remove('hidden');
-    document.getElementById('emailLabel').classList.remove('hidden');
-    document.getElementById('switchLink').innerHTML =
-      'Already have an account? <a onclick="toggleAuthMode()">Sign in</a>';
-  } else {
-    document.getElementById('authMode').dataset.mode = 'login';
-    document.getElementById('authTitle').textContent = 'Sign in';
-    document.querySelector('.auth-sub').textContent = 'Welcome back to LocusAdvisory';
-    document.getElementById('authSubmitBtn').textContent = 'Sign In';
-    document.getElementById('authEmail').parentElement.classList.add('hidden');
-    document.getElementById('emailLabel').classList.add('hidden');
-    document.getElementById('switchLink').innerHTML =
-      'New here? <a onclick="toggleAuthMode()">Create an account</a>';
-  }
+function setAuthError(viewId, msg) {
+  const el = document.getElementById('auth' + viewId.charAt(0).toUpperCase() + viewId.slice(1) + 'Error');
+  if (!el) return;
+  if (!msg) { el.classList.add('hidden'); el.textContent = ''; return; }
+  el.textContent = msg;
+  el.classList.remove('hidden');
 }
 
-async function submitAuth() {
-  const mode = document.getElementById('authMode').dataset.mode;
-  const username = document.getElementById('authUsername').value.trim();
-  const password = document.getElementById('authPassword').value;
+function showAuthView(view) {
+  document.getElementById('mainApp').classList.add('hidden');
+  document.getElementById('authView').classList.remove('hidden');
+  ['login', 'register', 'forgot'].forEach(function(v) {
+    document.getElementById('auth' + v.charAt(0).toUpperCase() + v.slice(1)).classList.add('hidden');
+    setAuthError(v, null);
+  });
+  document.getElementById('auth' + view.charAt(0).toUpperCase() + view.slice(1)).classList.remove('hidden');
+}
 
-  if (!username || !password) { alert('Username and password required'); return; }
+function startCooldown(btnId) {
+  if (authCooldown[btnId]) clearInterval(authCooldown[btnId]);
+  let seconds = 60;
+  const btn = document.getElementById(btnId);
+  if (!btn) return;
+  btn.disabled = true; btn.textContent = seconds + 's';
+  authCooldown[btnId] = setInterval(function() {
+    seconds--; btn.textContent = seconds + 's';
+    if (seconds <= 0) { clearInterval(authCooldown[btnId]); btn.disabled = false; btn.textContent = 'Send Code'; }
+  }, 1000);
+}
 
+async function sendVerifyCode(purpose) {
+  let email, btnId, devId, viewId;
+  if (purpose === 'register') { email = document.getElementById('regEmail').value.trim(); btnId = 'regSendCodeBtn'; devId = 'regDevCode'; viewId = 'register'; }
+  else { email = document.getElementById('forgotEmail').value.trim(); btnId = 'forgotSendCodeBtn'; devId = 'forgotDevCode'; viewId = 'forgot'; }
+  setAuthError(viewId, null);
+  if (!email) { setAuthError(viewId, 'Please enter your email'); return; }
   try {
-    let result;
-    if (mode === 'signup') {
-      const email = document.getElementById('authEmail').value.trim();
-      if (!email) { alert('Email required for signup'); return; }
-      result = await api('POST', '/api/users', { username: username, email: email, password: password });
-    } else {
-      result = await api('POST', '/api/login', { username: username, password: password });
+    const result = await api('POST', '/api/auth/send-code', { email: email, purpose: purpose });
+    if (result.dev_code) {
+      const devEl = document.getElementById(devId);
+      if (devEl) { devEl.textContent = 'DEV MODE - Your code: ' + result.dev_code; devEl.classList.remove('hidden'); }
     }
-    currentUser = result;
-    currentUserId = result.id;
-    showMainApp();
-  } catch (e) {
-    alert(e.message);
-  }
+    showFlash(result.message || 'Verification code sent! Check your inbox.');
+    startCooldown(btnId);
+  } catch (e) { setAuthError(viewId, e.message); }
+}
+
+async function doLogin() {
+  const identifier = document.getElementById('loginIdentifier').value.trim();
+  const password = document.getElementById('loginPassword').value;
+  setAuthError('login', null);
+  if (!identifier || !password) { setAuthError('login', 'Please fill in all fields'); return; }
+  try {
+    const result = await api('POST', '/api/login', { username: identifier, password: password });
+    currentUser = result; currentUserId = result.id; showMainApp();
+  } catch (e) { setAuthError('login', e.message); }
+}
+
+async function doRegister() {
+  const username = document.getElementById('regUsername').value.trim();
+  const email = document.getElementById('regEmail').value.trim().toLowerCase();
+  const password = document.getElementById('regPassword').value;
+  const code = document.getElementById('regCode').value.trim();
+  setAuthError('register', null);
+  if (!username || !email || !password) { setAuthError('register', 'Please fill in all fields'); return; }
+  if (password.length < 6) { setAuthError('register', 'Password must be at least 6 characters'); return; }
+  try {
+    const result = await api('POST', '/api/users', { username: username, email: email, password: password, verification_code: code });
+    currentUser = result; currentUserId = result.id; showMainApp();
+  } catch (e) { setAuthError('register', e.message); }
+}
+
+async function doResetPassword() {
+  const email = document.getElementById('forgotEmail').value.trim().toLowerCase();
+  const code = document.getElementById('forgotCode').value.trim();
+  const newPw = document.getElementById('forgotNewPassword').value;
+  setAuthError('forgot', null);
+  if (!email || !code || !newPw) { setAuthError('forgot', 'Please fill in all fields'); return; }
+  if (newPw.length < 6) { setAuthError('forgot', 'Password must be at least 6 characters'); return; }
+  try {
+    await api('POST', '/api/auth/reset-password', { email: email, code: code, new_password: newPw });
+    showFlash('Password reset successfully! Please sign in with your new password.');
+    showAuthView('login');
+  } catch (e) { setAuthError('forgot', e.message); }
 }
 
 async function logout() {
   try { await api('POST', '/api/logout'); } catch(e) {}
-  currentUser = null;
-  currentUserId = null;
-  showAuthView();
-}
-
-function showAuthView() {
-  document.getElementById('mainApp').classList.add('hidden');
-  document.getElementById('authView').classList.remove('hidden');
+  currentUser = null; currentUserId = null; showAuthView('login');
 }
 
 function showMainApp() {
   document.getElementById('authView').classList.add('hidden');
   document.getElementById('mainApp').classList.remove('hidden');
-  document.getElementById('userLabel').textContent = currentUser.username;
+  document.getElementById('userLabel').textContent = currentUser ? currentUser.username : 'User';
+  document.getElementById('welcomeName').textContent = currentUser ? currentUser.username : 'User';
+  initFeedbackForm();
   loadAssets();
   initCurrencySelects();
+  renderWelcomeStats();
 }
 
 async function checkAuth() {
   try {
     const user = await api('GET', '/api/me');
-    currentUser = user;
-    currentUserId = user.id;
-    showMainApp();
-  } catch (e) {
-    showAuthView();
+    currentUser = user; currentUserId = user.id; showMainApp();
+  } catch (e) { showAuthView('login'); }
+}
+
+async function renderWelcomeStats() {
+  if (!currentUserId) return;
+  const container = document.getElementById('welcomeStats');
+  if (!container) return;
+  try {
+    const assets = await api('GET', '/api/assets');
+    let totalLatest = 0; let withValues = 0;
+    for (let i = 0; i < assets.length; i++) {
+      const a = assets[i];
+      if (a.latest_value) { totalLatest += a.latest_value; withValues++; }
+    }
+    container.innerHTML =
+      '<div class="stat-box"><div class="stat-val">' + assets.length + '</div><div class="stat-label">Assets tracked</div></div>' +
+      '<div class="stat-box"><div class="stat-val">' + withValues + '</div><div class="stat-label">Assets with values</div></div>' +
+      '<div class="stat-box"><div class="stat-val">' + (totalLatest > 0 ? totalLatest.toLocaleString(undefined, {maximumFractionDigits: 0}) : '-') + '</div><div class="stat-label">Latest total value</div></div>' +
+      '<div class="stat-box"><div class="stat-val">' + (assets.length > 0 ? 'Ready' : 'Get Started') + '</div><div class="stat-label">Dashboard status</div></div>';
+  } catch (e) { container.innerHTML = ''; }
+}
+
+function initFeedbackForm() {
+  const ratingStars = document.querySelectorAll('#ratingStars .rating-star');
+  ratingStars.forEach(function(star) {
+    star.addEventListener('click', function() {
+      currentRating = parseInt(star.dataset.rating);
+      ratingStars.forEach(function(s) { s.classList.remove('active'); });
+      for (let i = 0; i < currentRating; i++) ratingStars[i].classList.add('active');
+    });
+  });
+  if (currentUser && currentUser.email) {
+    const fbEmail = document.getElementById('fbEmail');
+    if (fbEmail && !fbEmail.value) fbEmail.value = currentUser.email;
   }
+  if (currentUser && currentUser.username) {
+    const fbName = document.getElementById('fbName');
+    if (fbName && !fbName.value) fbName.value = currentUser.username;
+  }
+}
+
+async function submitFeedback() {
+  const email = document.getElementById('fbEmail').value.trim();
+  const name = document.getElementById('fbName').value.trim();
+  const message = document.getElementById('fbMessage').value.trim();
+  if (!email || !message) { alert('Email and feedback message are required'); return; }
+  try {
+    await api('POST', '/api/feedback', { name: name, email: email, rating: currentRating || null, message: message });
+    document.getElementById('feedbackForm').classList.add('hidden');
+    document.getElementById('feedbackSuccess').classList.remove('hidden');
+  } catch (e) { alert(e.message); }
 }
 
 async function populateSowTypes(selectId) {
@@ -836,16 +830,14 @@ async function populateSowTypes(selectId) {
   sel.innerHTML = types.map(function(t) { return '<option value="' + t.key + '">' + t.label + '</option>'; }).join('');
 }
 
-var currenciesList = null;
-
 async function populateCurrencies(selectId, selectedCode) {
   if (!currenciesList) { currenciesList = await api('GET', '/api/currencies'); }
-  var sel = document.getElementById(selectId);
+  const sel = document.getElementById(selectId);
   sel.innerHTML = currenciesList.map(function(c) {
     return '<option value="' + c.code + '">' + c.symbol + ' ' + c.code + ' - ' + c.label + '</option>';
   }).join('');
   if (selectedCode) {
-    for (var i = 0; i < sel.options.length; i++) {
+    for (let i = 0; i < sel.options.length; i++) {
       if (sel.options[i].value === selectedCode) { sel.selectedIndex = i; break; }
     }
   }
@@ -853,14 +845,12 @@ async function populateCurrencies(selectId, selectedCode) {
 
 function currencySymbol(code) {
   if (!currenciesList) return '$';
-  for (var i = 0; i < currenciesList.length; i++) {
-    if (currenciesList[i].code === code) return currenciesList[i].symbol;
-  }
+  for (let i = 0; i < currenciesList.length; i++) { if (currenciesList[i].code === code) return currenciesList[i].symbol; }
   return '$';
 }
 
 function formatMoney(value, code) {
-  var sym = currencySymbol(code || 'USD');
+  const sym = currencySymbol(code || 'USD');
   return sym + (value || 0).toLocaleString(undefined, {maximumFractionDigits: 2});
 }
 
@@ -879,10 +869,11 @@ async function loadAssets() {
     const tbody = document.getElementById('assetTableBody');
     tbody.innerHTML = '';
     if (assets.length === 0) {
-      tbody.innerHTML = '<tr><td colspan="6" style="text-align:center; padding: 32px; color: var(--muted);">No assets yet. Add one or import data.</td></tr>';
+      tbody.innerHTML = '<tr><td colspan="6" style="text-align:center; padding: 32px; color: var(--muted);">No assets yet. Click Import Data or Add Asset to get started.</td></tr>';
       return;
     }
-    for (const a of assets) {
+    for (let i = 0; i < assets.length; i++) {
+      const a = assets[i];
       const cur = a.currency || 'HKD';
       const latestVal = a.latest_value ? formatMoney(a.latest_value, cur) : '-';
       const row = document.createElement('tr');
@@ -892,15 +883,14 @@ async function loadAssets() {
       const mvs = a.monthly_values || {};
       const mvKeys = Object.keys(mvs).sort();
       let mvHtml = '';
-      if (mvKeys.length === 0) {
-        mvHtml = '<div style="color: var(--muted); font-size: 12px;">No monthly values yet.</div>';
-      } else {
-        for (const m of mvKeys) {
+      if (mvKeys.length === 0) { mvHtml = '<div style="color: var(--muted); font-size: 12px;">No monthly values yet.</div>'; }
+      else {
+        for (let j = 0; j < mvKeys.length; j++) {
+          const m = mvKeys[j];
           mvHtml += '<div class="mv-row"><span style="color: var(--muted);">' + m + '</span><span style="font-variant-numeric: tabular-nums;">' + formatMoney(mvs[m], cur) + '</span><button class="btn btn-danger btn-sm" onclick="deleteMV(' + a.id + ',\'' + m + '\')">X</button></div>';
         }
       }
       mvHtml += '<div class="mv-row" style="margin-top: 10px; padding-top: 10px; border-top: 1px solid var(--border);"><input id="mvMonth_' + a.id + '" placeholder="YYYY-MM" style="width: 120px;"><input id="mvValue_' + a.id + '" type="number" placeholder="Value" style="flex:1;"><button class="btn btn-primary btn-sm" onclick="addMV(' + a.id + ')">Add</button></div>';
-
       const mvTr = document.createElement('tr');
       mvTr.innerHTML = '<td colspan="6"><div class="mv-editor"><strong>Monthly Values (' + cur + ')</strong><div style="margin-top: 10px;">' + mvHtml + '</div></div></td>';
       tbody.appendChild(mvTr);
@@ -914,9 +904,7 @@ async function addAsset() {
   const cur = document.getElementById('newAssetCurrency').value;
   try {
     await api('POST', '/api/assets', { name: name, sow_type: type, currency: cur });
-    hideModal('addAssetModal');
-    showFlash('Asset added successfully');
-    loadAssets();
+    hideModal('addAssetModal'); showFlash('Asset added successfully'); loadAssets();
   } catch (e) { showFlash(e.message, 'error'); }
 }
 
@@ -924,26 +912,14 @@ function editAsset(id) {
   const rows = document.querySelectorAll('#assetTableBody tr');
   let name = '', type = '', cur = 'HKD';
   for (let i = 0; i < rows.length; i++) {
-    if (rows[i].querySelector('.btn-sm')) {
-      const onclick = rows[i].querySelector('.btn-sm').getAttribute('onclick') || '';
-      if (onclick.indexOf('editAsset(' + id + ')') !== -1) {
-        name = rows[i].cells[0].textContent;
-        type = rows[i].cells[1].textContent;
-        cur = rows[i].cells[2].textContent.trim();
-        break;
-      }
-    }
+    const onclick = rows[i].querySelector('.btn-sm') ? rows[i].querySelector('.btn-sm').getAttribute('onclick') || '' : '';
+    if (onclick.indexOf('editAsset(' + id + ')') !== -1) { name = rows[i].cells[0].textContent; type = rows[i].cells[1].textContent; cur = rows[i].cells[2].textContent.trim(); break; }
   }
   editingAssetId = id;
   document.getElementById('editAssetName').value = name;
-  Promise.all([
-    populateSowTypes('editAssetType'),
-    populateCurrencies('editAssetCurrency', cur),
-  ]).then(function() {
+  Promise.all([populateSowTypes('editAssetType'), populateCurrencies('editAssetCurrency', cur)]).then(function() {
     const sel = document.getElementById('editAssetType');
-    for (let i = 0; i < sel.options.length; i++) {
-      if (sel.options[i].value === type) { sel.selectedIndex = i; break; }
-    }
+    for (let i = 0; i < sel.options.length; i++) { if (sel.options[i].value === type) { sel.selectedIndex = i; break; } }
   });
   showModal('editAssetModal');
 }
@@ -954,70 +930,43 @@ async function saveAsset() {
   const cur = document.getElementById('editAssetCurrency').value;
   try {
     await api('PUT', '/api/assets/' + editingAssetId, { name: name, sow_type: type, currency: cur });
-    hideModal('editAssetModal');
-    showFlash('Asset updated');
-    loadAssets();
+    hideModal('editAssetModal'); showFlash('Asset updated'); loadAssets();
   } catch (e) { showFlash(e.message, 'error'); }
 }
 
 async function deleteAsset(id) {
   if (!confirm('Delete this asset and all its monthly values?')) return;
-  try {
-    await api('DELETE', '/api/assets/' + id);
-    showFlash('Asset deleted');
-    loadAssets();
-  } catch (e) { showFlash(e.message, 'error'); }
+  try { await api('DELETE', '/api/assets/' + id); showFlash('Asset deleted'); loadAssets(); } catch (e) { showFlash(e.message, 'error'); }
 }
 
 async function addMV(assetId) {
   const month = document.getElementById('mvMonth_' + assetId).value.trim();
   const value = document.getElementById('mvValue_' + assetId).value;
   if (!month || value === '') { showFlash('Both month and value required', 'error'); return; }
-  try {
-    await api('POST', '/api/assets/' + assetId + '/mv', { month: month, value: parseFloat(value) });
-    showFlash('Monthly value added');
-    loadAssets();
-  } catch (e) { showFlash(e.message, 'error'); }
+  try { await api('POST', '/api/assets/' + assetId + '/mv', { month: month, value: parseFloat(value) }); showFlash('Monthly value added'); loadAssets(); } catch (e) { showFlash(e.message, 'error'); }
 }
 
 async function deleteMV(assetId, month) {
   if (!confirm('Delete value for ' + month + '?')) return;
-  try {
-    await api('DELETE', '/api/assets/' + assetId + '/mv/' + month);
-    showFlash('Monthly value deleted');
-    loadAssets();
-  } catch (e) { showFlash(e.message, 'error'); }
+  try { await api('DELETE', '/api/assets/' + assetId + '/mv/' + month); showFlash('Monthly value deleted'); loadAssets(); } catch (e) { showFlash(e.message, 'error'); }
 }
 
 async function importSample() {
-  try {
-    const result = await api('POST', '/api/import-sample', {});
-    showFlash('Imported ' + result.count + ' assets');
-    loadAssets();
-  } catch (e) { showFlash(e.message, 'error'); }
+  try { const result = await api('POST', '/api/import-sample', {}); showFlash('Imported ' + result.total + ' assets'); loadAssets(); } catch (e) { showFlash(e.message, 'error'); }
 }
 
-function downloadTemplate() {
-  window.location.href = '/api/template';
-}
-
-function downloadMyAssets() {
-  window.location.href = '/api/export';
-}
+function downloadTemplate() { window.location.href = '/api/template'; }
+function downloadMyAssets() { window.location.href = '/api/export'; }
 
 async function uploadExcel() {
   const fileInput = document.getElementById('excelFile');
   if (!fileInput.files[0]) { showFlash('Please select a file', 'error'); return; }
-  const fd = new FormData();
-  fd.append('file', fileInput.files[0]);
+  const fd = new FormData(); fd.append('file', fileInput.files[0]);
   try {
     const result = await apiForm('POST', '/api/import', fd);
-    const msg = `Import complete: ${result.created} created, ${result.updated} updated (${result.total} total)`;
-    showFlash(msg);
+    showFlash('Import complete: ' + result.created + ' created, ' + result.updated + ' updated (' + result.total + ' total)');
     loadAssets();
-  } catch (e) {
-    showFlash(e.message, 'error');
-  }
+  } catch (e) { showFlash(e.message, 'error'); }
 }
 
 async function runForecast() {
@@ -1026,387 +975,224 @@ async function runForecast() {
   const stochastic = document.getElementById('stochastic').checked;
   const mcRuns = parseInt(document.getElementById('mcRuns').value) || 500;
   const displayCurrency = document.getElementById('forecastDisplayCurrency').value;
-
   const contribStr = document.getElementById('contribOverride').value.trim();
   const sowContribStr = document.getElementById('sowContribOverride').value.trim();
   const growthStr = document.getElementById('growthOverride').value.trim();
-  const contribOverrides = {};
-  const sowContribOverrides = {};
-  const growthOverrides = {};
-  if (contribStr) {
-    contribStr.split(',').forEach(function(p) {
-      const parts = p.split('=');
-      if (parts.length === 2) contribOverrides[parts[0].trim()] = parseFloat(parts[1]);
-    });
-  }
-  if (sowContribStr) {
-    sowContribStr.split(',').forEach(function(p) {
-      const idx = p.indexOf('=');
-      if (idx > 0) {
-        const name = p.substring(0, idx).trim();
-        const val = parseFloat(p.substring(idx + 1).trim());
-        if (name && !isNaN(val)) sowContribOverrides[name] = val;
-      }
-    });
-  }
-  if (growthStr) {
-    growthStr.split(',').forEach(function(p) {
-      const parts = p.split('=');
-      if (parts.length === 2) growthOverrides[parts[0].trim()] = parseFloat(parts[1]);
-    });
-  }
+  const contribOverrides = {}, sowContribOverrides = {}, growthOverrides = {};
+  if (contribStr) contribStr.split(',').forEach(function(p) { const parts = p.split('='); if (parts.length === 2) contribOverrides[parts[0].trim()] = parseFloat(parts[1]); });
+  if (sowContribStr) sowContribStr.split(',').forEach(function(p) { const parts = p.split('='); if (parts.length === 2) sowContribOverrides[parts[0].trim()] = parseFloat(parts[1]); });
+  if (growthStr) growthStr.split(',').forEach(function(p) { const parts = p.split('='); if (parts.length === 2) growthOverrides[parts[0].trim()] = parseFloat(parts[1]); });
+
+  const body = {
+    forecast_months: months,
+    stochastic: stochastic,
+    monte_carlo_runs: mcRuns,
+    growth_overrides: growthOverrides,
+    sow_contribution_overrides: sowContribOverrides,
+    contribution_overrides: contribOverrides,
+  };
+  if (displayCurrency) body.display_currency = displayCurrency;
 
   try {
-    showFlash('Running forecast...');
-    const result = await api('POST', '/api/forecast', {
-      forecast_months: months,
-      stochastic: stochastic,
-      monte_carlo_runs: mcRuns,
-      growth_overrides: growthOverrides,
-      min_growth_overrides: {},
-      max_growth_overrides: {},
-      contribution_overrides: contribOverrides,
-      sow_contribution_overrides: sowContribOverrides,
-      display_currency: displayCurrency,
-    });
-    showFlash('Forecast complete');
+    const result = await api('POST', '/api/forecast', body);
     renderForecast(result);
   } catch (e) { showFlash(e.message, 'error'); }
 }
 
 function renderForecast(result) {
   document.getElementById('forecastResults').classList.remove('hidden');
-  const growth = result.net_worth_growth || {};
   const kpiRow = document.getElementById('kpiRow');
-  const growthPct = growth.total_growth_pct || 0;
-  const pctClass = growthPct >= 0 ? 'pos' : 'neg';
-  const tv = getComputedThemeVars();
-  const dispCur = result.display_currency || 'HKD';
-  const dispSym = currencySymbol(dispCur);
+  let kpiHtml = '';
+  if (result.starting_value !== undefined) {
+    kpiHtml += '<div class="kpi"><div class="label">Starting Value</div><div class="value">' + formatMoney(result.starting_value, result.display_currency || 'HKD') + '</div></div>';
+  }
+  if (result.final_value !== undefined) {
+    kpiHtml += '<div class="kpi"><div class="label">Forecast Final Value</div><div class="value ' + (result.final_value >= result.starting_value ? 'pos' : 'neg') + '">' + formatMoney(result.final_value, result.display_currency || 'HKD') + '</div></div>';
+  }
+  if (result.total_growth !== undefined) {
+    kpiHtml += '<div class="kpi"><div class="label">Total Growth</div><div class="value ' + (result.total_growth >= 0 ? 'pos' : 'neg') + '">' + (result.total_growth >= 0 ? '+' : '') + (result.total_growth * 100).toFixed(1) + '%</div></div>';
+  }
+  if (result.stochastic && result.confidence_50 !== undefined) {
+    kpiHtml += '<div class="kpi"><div class="label">50% Confidence</div><div class="value">' + formatMoney(result.confidence_50, result.display_currency || 'HKD') + '</div><div class="sub">End value range</div></div>';
+  }
+  kpiRow.innerHTML = kpiHtml;
 
-  kpiRow.innerHTML =
-    '<div class="kpi"><div class="label">Start Net Worth (' + dispCur + ')</div><div class="value">' + dispSym + (growth.start_net_worth || 0).toLocaleString(undefined, {maximumFractionDigits: 0}) + '</div><div class="sub">' + (growth.start_month || '') + '</div></div>' +
-    '<div class="kpi"><div class="label">End Net Worth (' + dispCur + ')</div><div class="value">' + dispSym + (growth.end_net_worth || 0).toLocaleString(undefined, {maximumFractionDigits: 0}) + '</div><div class="sub">' + (growth.end_month || '') + '</div></div>' +
-    '<div class="kpi"><div class="label">Total Growth</div><div class="value ' + pctClass + '">' + growthPct.toFixed(2) + '%</div><div class="sub">Projected change</div></div>' +
-    '<div class="kpi"><div class="label">Forecast Months</div><div class="value">' + (result.forecast_months || []).length + '</div><div class="sub">Monthly projections</div></div>';
-
-  const ctx = document.getElementById('forecastChart').getContext('2d');
+  const trendCtx = document.getElementById('forecastChart').getContext('2d');
   if (charts.trend) charts.trend.destroy();
-  const colors = ['#1e40af','#059669','#d97706','#7c3aed','#dc2626','#0891b2','#ca8a04','#1d4ed8','#b91c1c','#2563eb'];
-  let ci = 0;
-  const labels = result.forecast_months || [];
-  const datasets = [];
-  let combinedLabels = [];
 
-  if (result.monthly_totals) {
-    const hist = (result.sow_summaries || []);
-    let earliestHistMonth = null;
-    let earliestHistTotal = null;
-    const monthlyTotals = result.monthly_totals;
-    const fmonths = result.forecast_months || [];
+  const labels = (result.scenarios || []).map(function(s) { return s.month; });
+  const scenarioValues = (result.scenarios || []).map(function(s) { return s.total_value; });
 
-    const allMonths = Object.keys(monthlyTotals).concat(fmonths.filter(function(m) { return !(m in monthlyTotals); }));
-    combinedLabels = allMonths.length ? allMonths : fmonths;
-
-    const combinedData = combinedLabels.map(function(m) { return monthlyTotals[m] ?? null; });
-    datasets.push({
-      label: 'Total (' + dispCur + ')',
-      data: combinedData,
-      borderColor: colors[ci % colors.length],
-      backgroundColor: colors[ci % colors.length] + '20',
-      tension: 0.35,
-      pointRadius: 2,
-      pointHoverRadius: 4,
-      spanGaps: true,
-      borderWidth: 3,
-    });
-    ci++;
-
-    if (result.forecasts) {
-      for (const [name, fc] of Object.entries(result.forecasts)) {
-        const fcur = (result.sow_summaries || []).find(function(s) { return s.name === name; });
-        const cur = fcur ? fcur.currency : 'HKD';
-        const histVal = fcur ? fcur.latest_historical_value : null;
-        const histMonth = fcur ? fcur.latest_historical_month : null;
-        const fcArr = fmonths.map(function(m) { return fc[m] ?? 0; });
-        const perSowLabels = histMonth ? [histMonth].concat(fmonths) : fmonths;
-        const perSowData = histVal != null ? [histVal].concat(fcArr) : fcArr;
-        datasets.push({
-          label: name + ' (' + cur + ')',
-          data: perSowData,
-          borderColor: colors[ci % colors.length],
-          backgroundColor: colors[ci % colors.length] + '20',
-          tension: 0.35,
-          pointRadius: 2,
-          pointHoverRadius: 4,
-          spanGaps: false,
-          borderWidth: 1.5,
-          borderDash: [4, 3],
-        });
-        ci++;
+  const tv = getComputedThemeVars();
+  charts.trend = new Chart(trendCtx, {
+    type: 'line',
+    data: {
+      labels: labels,
+      datasets: [{
+        label: 'Portfolio Value',
+        data: scenarioValues,
+        borderColor: '#1e40af',
+        backgroundColor: 'rgba(30, 64, 175, 0.1)',
+        fill: true,
+        tension: 0.3,
+        pointRadius: 3,
+        pointHoverRadius: 6,
+      }]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      plugins: {
+        legend: { labels: { color: tv.chartText } }
+      },
+      scales: {
+        x: { grid: { color: tv.chartGrid }, ticks: { color: tv.chartText } },
+        y: { grid: { color: tv.chartGrid }, ticks: { color: tv.chartText } }
       }
     }
+  });
 
-    charts.trend = new Chart(ctx, {
-      type: 'line',
-      data: { labels: combinedLabels.length ? combinedLabels : labels, datasets: datasets },
-      options: {
-        responsive: true,
-        maintainAspectRatio: false,
-        interaction: { mode: 'index', intersect: false },
-        scales: {
-          x: {
-            grid: { color: tv.chartGrid },
-            ticks: { color: tv.chartText, maxRotation: 0, autoSkip: true, maxTicksLimit: 8 }
-          },
-          y: {
-            grid: { color: tv.chartGrid },
-            ticks: { color: tv.chartText, callback: function(v) { return dispSym + (v || 0).toLocaleString(); } }
-          }
-        },
-        plugins: {
-          legend: {
-            position: 'bottom',
-            labels: { color: tv.chartText, pointStyle: 'circle', usePointStyle: true, padding: 16, font: { size: 11 } }
-          },
-          tooltip: {
-            backgroundColor: tv.card,
-            titleColor: tv.text || tv.chartText,
-            bodyColor: tv.chartText,
-            borderColor: tv.border,
-            borderWidth: 1,
-            padding: 12,
-            cornerRadius: 8,
-          }
-        }
-      }
-    });
-  }
-
-  const pieCtx = document.getElementById('pieChart').getContext('2d');
-  if (charts.pie) charts.pie.destroy();
-  if (result.type_summary) {
-    const pieLabels = Object.values(result.type_summary).map(function(t) { return t.label; });
-    const pieValues = Object.values(result.type_summary).map(function(t) { return t.forecast_end_value; });
+  if (result.forecast_breakdown && result.forecast_breakdown.length > 0) {
+    const lastBreakdown = result.forecast_breakdown[result.forecast_breakdown.length - 1];
+    const pieCtx = document.getElementById('pieChart').getContext('2d');
+    if (charts.pie) charts.pie.destroy();
+    const keys = Object.keys(lastBreakdown);
+    const vals = keys.map(function(k) { return lastBreakdown[k]; });
+    const colors = ['#1e40af', '#3b82f6', '#60a5fa', '#93c5fd', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6'];
     charts.pie = new Chart(pieCtx, {
       type: 'doughnut',
       data: {
-        labels: pieLabels,
+        labels: keys,
         datasets: [{
-          data: pieValues,
-          backgroundColor: ['#1e40af','#059669','#d97706','#7c3aed','#dc2626','#0891b2','#ca8a04','#1d4ed8'],
-          borderWidth: 3,
+          data: vals,
+          backgroundColor: colors.slice(0, keys.length),
           borderColor: tv.card,
+          borderWidth: 2,
         }]
       },
       options: {
         responsive: true,
         maintainAspectRatio: false,
-        cutout: '62%',
         plugins: {
-          legend: {
-            position: 'right',
-            labels: { color: tv.chartText, padding: 12, font: { size: 12 } }
-          },
-          tooltip: {
-            backgroundColor: tv.card,
-            titleColor: tv.text || tv.chartText,
-            bodyColor: tv.chartText,
-            borderColor: tv.border,
-            borderWidth: 1,
-            padding: 12,
-            cornerRadius: 8,
-          }
+          legend: { position: 'right', labels: { color: tv.chartText } }
         }
       }
     });
   }
 }
 
-var cachedSettings = null;
-
-function fmtPct(v) { return (v == null || isNaN(v)) ? '' : (v * 100).toFixed(1); }
-function parsePct(s) {
-  if (s == null || s === '') return null;
-  var n = parseFloat(s);
-  if (isNaN(n)) return null;
-  return Math.abs(n) <= 1 ? n : n / 100;
+async function initCurrencySelects() {
+  if (!currenciesList) currenciesList = await api('GET', '/api/currencies');
+  const fcSel = document.getElementById('forecastDisplayCurrency');
+  if (fcSel) {
+    fcSel.innerHTML = currenciesList.map(function(c) {
+      return '<option value="' + c.code + '">' + c.symbol + ' ' + c.code + ' - ' + c.label + '</option>';
+    }).join('');
+  }
 }
 
 async function loadSettings() {
-  if (cachedSettings) { renderSettings(cachedSettings); return; }
   try {
-    var data = await api('GET', '/api/settings');
-    cachedSettings = data;
-    renderSettings(data);
+    const data = await api('GET', '/api/settings');
+    const container = document.getElementById('settingsTable');
+    let html = '<table><thead><tr><th>SOW Type</th><th style="text-align:center;">Annual Growth</th><th style="text-align:center;">Monthly Contribution</th><th style="text-align:center;">Min Growth</th><th style="text-align:center;">Max Growth</th></tr></thead><tbody>';
+    for (let i = 0; i < data.sow_types.length; i++) {
+      const t = data.sow_types[i];
+      const o = t.overrides || {};
+      html += '<tr>';
+      html += '<td><strong>' + t.label + '</strong><div style="color: var(--muted); font-size: 11px;">' + t.key + (t.is_asset ? ' (asset)' : '') + '</div></td>';
+      html += '<td><input type="number" step="0.001" placeholder="' + (t.defaults.annual_growth != null ? t.defaults.annual_growth : 'default') + '" value="' + (o.annual_growth != null ? o.annual_growth : '') + '" data-key="' + t.key + '" data-field="annual_growth"></td>';
+      html += '<td><input type="number" step="1" placeholder="' + (t.defaults.monthly_contribution != null ? t.defaults.monthly_contribution : 'default') + '" value="' + (o.monthly_contribution != null ? o.monthly_contribution : '') + '" data-key="' + t.key + '" data-field="monthly_contribution"></td>';
+      html += '<td><input type="number" step="0.001" placeholder="default" value="' + (o.min_growth != null ? o.min_growth : '') + '" data-key="' + t.key + '" data-field="min_growth"></td>';
+      html += '<td><input type="number" step="0.001" placeholder="default" value="' + (o.max_growth != null ? o.max_growth : '') + '" data-key="' + t.key + '" data-field="max_growth"></td>';
+      html += '</tr>';
+    }
+    html += '</tbody></table>';
+    container.innerHTML = html;
   } catch (e) { showFlash(e.message, 'error'); }
 }
 
-function renderSettings(data) {
-  var html = '<table style="width: 100%; border-collapse: separate; border-spacing: 0; font-size: 14px;">';
-  html += '<thead><tr>';
-  html += '<th style="text-align:left; padding: 12px;">SOW Type</th>';
-  html += '<th style="padding: 12px;">Default Growth</th>';
-  html += '<th style="padding: 12px;">Your Growth</th>';
-  html += '<th style="padding: 12px;">Default Contrib</th>';
-  html += '<th style="padding: 12px;">Your Contrib</th>';
-  html += '<th style="padding: 12px;">Stochastic Min</th>';
-  html += '<th style="padding: 12px;">Stochastic Max</th>';
-  html += '</tr></thead><tbody>';
-  data.sow_types.forEach(function(t) {
-    var o = t.overrides || {};
-    html += '<tr>';
-    html += '<td style="padding: 12px;"><strong>' + t.label + '</strong><br><span style="color: var(--muted); font-size: 12px;">' + t.key + '</span></td>';
-    html += '<td style="padding: 12px; color: var(--muted);">' + fmtPct(t.defaults.annual_growth) + '%</td>';
-    html += '<td style="padding: 12px;"><input type="number" step="0.1" style="width: 90px;" id="sg_' + t.key + '" value="' + fmtPct(o.annual_growth) + '" placeholder="default"></td>';
-    html += '<td style="padding: 12px; color: var(--muted);">' + (t.defaults.monthly_contribution || 0).toLocaleString() + '</td>';
-    html += '<td style="padding: 12px;"><input type="number" step="1" style="width: 110px;" id="sc_' + t.key + '" value="' + (o.monthly_contribution != null ? o.monthly_contribution : '') + '" placeholder="default"></td>';
-    html += '<td style="padding: 12px;"><input type="number" step="0.1" style="width: 80px;" id="smin_' + t.key + '" value="' + fmtPct(o.min_growth) + '" placeholder="default"></td>';
-    html += '<td style="padding: 12px;"><input type="number" step="0.1" style="width: 80px;" id="smax_' + t.key + '" value="' + fmtPct(o.max_growth) + '" placeholder="default"></td>';
-    html += '</tr>';
-  });
-  html += '</tbody></table>';
-  document.getElementById('settingsTable').innerHTML = html;
-}
-
-function resetSettingsForm() {
-  if (!cachedSettings) return;
-  cachedSettings.sow_types.forEach(function(t) {
-    document.getElementById('sg_' + t.key).value = '';
-    document.getElementById('sc_' + t.key).value = '';
-    document.getElementById('smin_' + t.key).value = '';
-    document.getElementById('smax_' + t.key).value = '';
-  });
-}
-
 async function saveSettings() {
-  var overrides = {};
-  cachedSettings.sow_types.forEach(function(t) {
-    var g = parsePct(document.getElementById('sg_' + t.key).value);
-    var c = document.getElementById('sc_' + t.key).value;
-    var mn = parsePct(document.getElementById('smin_' + t.key).value);
-    var mx = parsePct(document.getElementById('smax_' + t.key).value);
-    var contrib = (c == null || c === '') ? null : parseFloat(c);
-    if (g != null || contrib != null || mn != null || mx != null) {
-      overrides[t.key] = { annual_growth: g, monthly_contribution: contrib, min_growth: mn, max_growth: mx };
+  const inputs = document.querySelectorAll('#settingsTable input');
+  const overrides = {};
+  inputs.forEach(function(inp) {
+    const key = inp.dataset.key;
+    const field = inp.dataset.field;
+    const raw = inp.value.trim();
+    if (!overrides[key]) overrides[key] = {};
+    if (raw === '') overrides[key][field] = null;
+    else {
+      const fv = parseFloat(raw);
+      overrides[key][field] = isNaN(fv) ? null : fv;
     }
   });
   try {
     await api('PUT', '/api/settings', { overrides: overrides });
-    showFlash('Settings saved');
-    cachedSettings = null;
-    await loadSettings();
+    showFlash('Settings saved successfully');
   } catch (e) { showFlash(e.message, 'error'); }
 }
 
-var cachedCurrencySettings = null;
-
-async function initCurrencySelects() {
-  if (!currenciesList) { currenciesList = await api('GET', '/api/currencies'); }
-  var foreSel = document.getElementById('forecastDisplayCurrency');
-  if (foreSel && foreSel.options.length === 0) {
-    foreSel.innerHTML = currenciesList.map(function(c) {
-      return '<option value="' + c.code + '">' + c.symbol + ' ' + c.code + '</option>';
-    }).join('');
-  }
-  try {
-    var cs = await api('GET', '/api/currency-settings');
-    if (foreSel) {
-      for (var i = 0; i < foreSel.options.length; i++) {
-        if (foreSel.options[i].value === cs.display_currency) { foreSel.selectedIndex = i; break; }
-      }
-    }
-  } catch(e) {}
+function resetSettingsForm() {
+  const inputs = document.querySelectorAll('#settingsTable input');
+  inputs.forEach(function(inp) { inp.value = ''; });
 }
 
 async function loadCurrencySettings() {
-  if (!currentUserId) return;
   try {
-    var data = await api('GET', '/api/currency-settings');
-    cachedCurrencySettings = data;
-    renderCurrencySettings(data);
+    const data = await api('GET', '/api/currency-settings');
+    const sel = document.getElementById('displayCurrencySelect');
+    if (sel) {
+      sel.innerHTML = data.available_currencies.map(function(c) {
+        return '<option value="' + c.code + '">' + c.symbol + ' ' + c.code + ' - ' + c.label + '</option>';
+      }).join('');
+      for (let i = 0; i < sel.options.length; i++) {
+        if (sel.options[i].value === data.display_currency) { sel.selectedIndex = i; break; }
+      }
+    }
+    const ratesTable = document.getElementById('currencyRatesTable');
+    let html = '<table><thead><tr><th>Currency</th><th style="text-align:center;">Rate (vs USD)</th><th style="text-align:center;">Default</th></tr></thead><tbody>';
+    const codes = Object.keys(data.currency_rates);
+    for (let i = 0; i < codes.length; i++) {
+      const code = codes[i];
+      const cur = data.available_currencies.find(function(c) { return c.code === code; });
+      const customRate = data.currency_rates[code];
+      const defaultRate = data.default_rates[code];
+      const isCustom = customRate !== undefined && defaultRate !== undefined && customRate !== defaultRate;
+      html += '<tr>';
+      html += '<td><strong>' + (cur ? cur.symbol : '') + ' ' + code + '</strong>' + (cur ? '<div style="color: var(--muted); font-size: 11px;">' + cur.label + '</div>' : '') + '</td>';
+      html += '<td><input type="number" step="0.0001" value="' + customRate + '" data-currency="' + code + '" data-field="rate"></td>';
+      html += '<td style="color: var(--muted);">' + defaultRate + (isCustom ? ' <span style="color: var(--accent); font-size: 11px;">(modified)</span>' : '') + '</td>';
+      html += '</tr>';
+    }
+    html += '</tbody></table>';
+    ratesTable.innerHTML = html;
   } catch (e) { showFlash(e.message, 'error'); }
-}
-
-function renderCurrencySettings(data) {
-  var dispSel = document.getElementById('displayCurrencySelect');
-  dispSel.innerHTML = data.available_currencies.map(function(c) {
-    return '<option value="' + c.code + '">' + c.symbol + ' ' + c.code + ' - ' + c.label + '</option>';
-  }).join('');
-  for (var i = 0; i < dispSel.options.length; i++) {
-    if (dispSel.options[i].value === data.display_currency) { dispSel.selectedIndex = i; break; }
-  }
-
-  var html = '<table style="width: 100%; border-collapse: separate; border-spacing: 0; font-size: 14px;">';
-  html += '<thead><tr>';
-  html += '<th style="text-align:left; padding: 10px;">Currency</th>';
-  html += '<th style="padding: 10px;">Default Rate (1 USD = ?)</th>';
-  html += '<th style="padding: 10px;">Your Rate</th>';
-  html += '</tr></thead><tbody>';
-
-  var baseCodes = data.available_currencies.map(function(c) { return c.code; });
-  if (baseCodes.indexOf('USD') === -1) baseCodes.unshift('USD');
-
-  for (var ci = 0; ci < baseCodes.length; ci++) {
-    var code = baseCodes[ci];
-    var curInfo = null;
-    for (var j = 0; j < data.available_currencies.length; j++) {
-      if (data.available_currencies[j].code === code) { curInfo = data.available_currencies[j]; break; }
-    }
-    var label = curInfo ? (curInfo.symbol + ' ' + curInfo.code + ' - ' + curInfo.label) : code;
-    var defaultRate = data.default_rates[code] != null ? data.default_rates[code] : '-';
-    var userRate = data.currency_rates && data.currency_rates[code] != null ? data.currency_rates[code] : '';
-    var inputId = 'cr_' + code;
-
-    html += '<tr>';
-    html += '<td style="padding: 10px;"><strong>' + label + '</strong></td>';
-    html += '<td style="padding: 10px; color: var(--muted);">' + defaultRate + '</td>';
-    if (code === 'USD') {
-      html += '<td style="padding: 10px; color: var(--muted);">1.0 (base)</td>';
-    } else {
-      html += '<td style="padding: 10px;"><input type="number" step="0.0001" min="0.0001" style="width: 130px;" id="' + inputId + '" value="' + userRate + '" placeholder="' + (data.default_rates[code] || '') + '"></td>';
-    }
-    html += '</tr>';
-  }
-  html += '</tbody></table>';
-  document.getElementById('currencyRatesTable').innerHTML = html;
 }
 
 async function saveCurrencySettings() {
-  if (!cachedCurrencySettings) return;
-  var disp = document.getElementById('displayCurrencySelect').value;
-  var rates = {};
-  var baseCodes = cachedCurrencySettings.available_currencies.map(function(c) { return c.code; });
-  for (var i = 0; i < baseCodes.length; i++) {
-    var code = baseCodes[i];
-    if (code === 'USD') continue;
-    var el = document.getElementById('cr_' + code);
-    if (el && el.value && el.value.trim()) {
-      var v = parseFloat(el.value);
-      if (!isNaN(v) && v > 0) rates[code] = v;
-    }
-  }
+  const displayCurrency = document.getElementById('displayCurrencySelect').value;
+  const rateInputs = document.querySelectorAll('#currencyRatesTable input[data-field="rate"]');
+  const rates = {};
+  rateInputs.forEach(function(inp) {
+    const code = inp.dataset.currency;
+    const fv = parseFloat(inp.value);
+    if (code && !isNaN(fv) && fv > 0) rates[code] = fv;
+  });
   try {
-    await api('PUT', '/api/currency-settings', {
-      display_currency: disp,
-      currency_rates: rates,
-    });
+    await api('PUT', '/api/currency-settings', { display_currency: displayCurrency, currency_rates: rates });
     showFlash('Currency settings saved');
-    cachedCurrencySettings = null;
-    await loadCurrencySettings();
-    await initCurrencySelects();
   } catch (e) { showFlash(e.message, 'error'); }
 }
 
-function resetCurrencyRatesToDefaults() {
-  if (!cachedCurrencySettings) return;
-  var codes = cachedCurrencySettings.available_currencies.map(function(c) { return c.code; });
-  for (var i = 0; i < codes.length; i++) {
-    var code = codes[i];
-    if (code === 'USD') continue;
-    var el = document.getElementById('cr_' + code);
-    if (el) el.value = '';
-  }
+async function resetCurrencyRatesToDefaults() {
+  try {
+    const data = await api('GET', '/api/currency-settings');
+    const rateInputs = document.querySelectorAll('#currencyRatesTable input[data-field="rate"]');
+    rateInputs.forEach(function(inp) {
+      const code = inp.dataset.currency;
+      if (data.default_rates[code] !== undefined) inp.value = data.default_rates[code];
+    });
+  } catch (e) { showFlash(e.message, 'error'); }
 }
 
 initTheme();

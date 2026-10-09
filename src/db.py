@@ -4,12 +4,15 @@ import hashlib
 import re
 import json
 import requests
+import random
+import secrets
 from contextlib import contextmanager
-from datetime import datetime
+from datetime import datetime, timedelta
 from typing import Dict, List, Optional, Tuple
 
 from sow_types import SOW_TYPES
 from currencies import CURRENCIES, DEFAULT_CURRENCY, DEFAULT_EXCHANGE_RATES
+from config import TURSO_URL, TURSO_AUTH_TOKEN, resolve_db_path
 
 
 class _TursoConn:
@@ -160,20 +163,12 @@ class Database:
     def __init__(self, db_path: Optional[str] = None):
         self._conn = None
 
-        turso_url = os.environ.get("TURSO_URL")
-        turso_token = os.environ.get("TURSO_AUTH_TOKEN")
-
-        if turso_url and turso_token:
-            self._conn = _TursoConn(turso_url, turso_token)
+        if TURSO_URL and TURSO_AUTH_TOKEN:
+            self._conn = _TursoConn(TURSO_URL, TURSO_AUTH_TOKEN)
             self._backend = "turso"
         else:
             if db_path is None:
-                db_path = os.environ.get("DB_PATH")
-            if db_path is None:
-                project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-                db_dir = os.path.join(project_root, "data")
-                os.makedirs(db_dir, exist_ok=True)
-                db_path = os.path.join(db_dir, "locus.db")
+                db_path = resolve_db_path()
             db_dir = os.path.dirname(db_path)
             if db_dir:
                 os.makedirs(db_dir, exist_ok=True)
@@ -269,8 +264,30 @@ class Database:
                     updated_at TEXT NOT NULL,
                     FOREIGN KEY (user_id) REFERENCES users(id)
                 );
+
+                CREATE TABLE IF NOT EXISTS verification_codes (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    email TEXT NOT NULL,
+                    code TEXT NOT NULL,
+                    purpose TEXT NOT NULL DEFAULT 'register',
+                    expires_at TEXT NOT NULL,
+                    used INTEGER NOT NULL DEFAULT 0,
+                    created_at TEXT NOT NULL
+                );
+
+                CREATE TABLE IF NOT EXISTS feedback (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    user_id INTEGER,
+                    name TEXT,
+                    email TEXT NOT NULL,
+                    rating INTEGER,
+                    message TEXT NOT NULL,
+                    created_at TEXT NOT NULL,
+                    FOREIGN KEY (user_id) REFERENCES users(id)
+                );
             """)
             self._migrate_assets_currency(conn)
+            self._migrate_users_email_verified(conn)
 
     def _migrate_assets_currency(self, conn):
         try:
@@ -278,6 +295,15 @@ class Database:
             col_names = [c["name"] if isinstance(c, dict) else c[1] for c in cols]
             if "currency" not in col_names:
                 conn.execute("ALTER TABLE assets ADD COLUMN currency TEXT NOT NULL DEFAULT 'HKD'")
+        except Exception:
+            pass
+
+    def _migrate_users_email_verified(self, conn):
+        try:
+            cols = conn.execute("PRAGMA table_info(users)").fetchall()
+            col_names = [c["name"] if isinstance(c, dict) else c[1] for c in cols]
+            if "email_verified" not in col_names:
+                conn.execute("ALTER TABLE users ADD COLUMN email_verified INTEGER NOT NULL DEFAULT 1")
         except Exception:
             pass
 
@@ -295,36 +321,72 @@ class Database:
         else:
             return result.lastrowid
 
-    def create_user(self, username: str, email: str, password: str) -> int:
+    def create_user(self, username: str, email: str, password: str, email_verified: bool = True) -> int:
         now = datetime.utcnow().isoformat()
         pw_hash = self._hash_password(password)
         with self._connect() as conn:
             return self._insert_and_get_id(
                 conn,
-                "INSERT INTO users (username, email, password_hash, created_at, updated_at) VALUES (?, ?, ?, ?, ?)",
-                (username, email, pw_hash, now, now),
+                "INSERT INTO users (username, email, password_hash, created_at, updated_at, email_verified) VALUES (?, ?, ?, ?, ?, ?)",
+                (username, email, pw_hash, now, now, 1 if email_verified else 0),
             )
 
     def authenticate_user(self, username: str, password: str) -> Optional[dict]:
         pw_hash = self._hash_password(password)
         with self._connect() as conn:
             row = conn.execute(
-                "SELECT id, username, email FROM users WHERE (username = ? OR email = ?) AND password_hash = ?",
+                "SELECT id, username, email, email_verified FROM users WHERE (username = ? OR email = ?) AND password_hash = ?",
                 (username, username, pw_hash),
             ).fetchone()
             if row:
-                return {"id": row["id"], "username": row["username"], "email": row["email"]}
+                return {"id": row["id"], "username": row["username"], "email": row["email"], "email_verified": bool(row["email_verified"])}
             return None
 
     def get_user(self, user_id: int) -> Optional[dict]:
         with self._connect() as conn:
             row = conn.execute(
-                "SELECT id, username, email, created_at FROM users WHERE id = ?",
+                "SELECT id, username, email, created_at, email_verified FROM users WHERE id = ?",
                 (user_id,),
             ).fetchone()
             if row:
-                return dict(row)
+                d = dict(row)
+                d["email_verified"] = bool(d.get("email_verified", 1))
+                return d
             return None
+
+    def get_user_by_email(self, email: str) -> Optional[dict]:
+        with self._connect() as conn:
+            row = conn.execute(
+                "SELECT id, username, email, email_verified FROM users WHERE email = ?",
+                (email,),
+            ).fetchone()
+            if row:
+                d = dict(row)
+                d["email_verified"] = bool(d.get("email_verified", 1))
+                return d
+            return None
+
+    def get_user_by_username_or_email(self, identifier: str) -> Optional[dict]:
+        with self._connect() as conn:
+            row = conn.execute(
+                "SELECT id, username, email, email_verified FROM users WHERE username = ? OR email = ?",
+                (identifier, identifier),
+            ).fetchone()
+            if row:
+                d = dict(row)
+                d["email_verified"] = bool(d.get("email_verified", 1))
+                return d
+            return None
+
+    def update_user_password(self, email: str, new_password: str) -> bool:
+        now = datetime.utcnow().isoformat()
+        pw_hash = self._hash_password(new_password)
+        with self._connect() as conn:
+            conn.execute(
+                "UPDATE users SET password_hash = ?, updated_at = ? WHERE email = ?",
+                (pw_hash, now, email),
+            )
+        return True
 
     def list_users(self) -> List[dict]:
         with self._connect() as conn:
@@ -652,3 +714,74 @@ class Database:
                         now,
                     ),
                 )
+
+    @staticmethod
+    def generate_verification_code() -> str:
+        return "{:06d}".format(random.randint(0, 999999))
+
+    def create_verification_code(self, email: str, purpose: str = "register") -> str:
+        code = self.generate_verification_code()
+        now = datetime.utcnow()
+        expires_at = (now + timedelta(minutes=15)).isoformat()
+        with self._connect() as conn:
+            conn.execute(
+                "INSERT INTO verification_codes (email, code, purpose, expires_at, used, created_at) VALUES (?, ?, ?, ?, 0, ?)",
+                (email.lower(), code, purpose, expires_at, now.isoformat()),
+            )
+        return code
+
+    def verify_code(self, email: str, code: str, purpose: str = "register") -> bool:
+        now = datetime.utcnow().isoformat()
+        with self._connect() as conn:
+            row = conn.execute(
+                "SELECT id FROM verification_codes WHERE email = ? AND code = ? AND purpose = ? AND used = 0 AND expires_at > ? ORDER BY created_at DESC LIMIT 1",
+                (email.lower(), code, purpose, now),
+            ).fetchone()
+            if row:
+                conn.execute(
+                    "UPDATE verification_codes SET used = 1 WHERE id = ?",
+                    (row["id"],),
+                )
+                return True
+            return False
+
+    def has_pending_code(self, email: str, purpose: str = "register") -> bool:
+        now = datetime.utcnow().isoformat()
+        with self._connect() as conn:
+            row = conn.execute(
+                "SELECT id FROM verification_codes WHERE email = ? AND purpose = ? AND used = 0 AND expires_at > ?",
+                (email.lower(), purpose, now),
+            ).fetchone()
+            return row is not None
+
+    def create_feedback(self, user_id: Optional[int], email: str, message: str, rating: Optional[int] = None, name: Optional[str] = None) -> int:
+        now = datetime.utcnow().isoformat()
+        with self._connect() as conn:
+            return self._insert_and_get_id(
+                conn,
+                "INSERT INTO feedback (user_id, name, email, rating, message, created_at) VALUES (?, ?, ?, ?, ?, ?)",
+                (user_id, name, email, rating, message, now),
+            )
+
+    def list_feedback(self) -> List[dict]:
+        with self._connect() as conn:
+            rows = conn.execute(
+                "SELECT id, user_id, name, email, rating, message, created_at FROM feedback ORDER BY created_at DESC"
+            ).fetchall()
+            return [dict(r) for r in rows]
+
+    def is_username_taken(self, username: str) -> bool:
+        with self._connect() as conn:
+            row = conn.execute(
+                "SELECT id FROM users WHERE username = ?",
+                (username,),
+            ).fetchone()
+            return row is not None
+
+    def is_email_taken(self, email: str) -> bool:
+        with self._connect() as conn:
+            row = conn.execute(
+                "SELECT id FROM users WHERE email = ?",
+                (email.lower(),),
+            ).fetchone()
+            return row is not None
