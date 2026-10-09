@@ -1,4 +1,4 @@
-import json, os, sys, tempfile
+import json, os, sys, tempfile, re
 from datetime import datetime
 from flask import Flask, request, jsonify, session, redirect, send_file
 from flask_cors import CORS
@@ -9,15 +9,17 @@ from db_loader import load_user_sow_data
 from main import run_pipeline_from_sow_list
 from sow_types import SOW_TYPES
 from currencies import CURRENCIES, DEFAULT_CURRENCY, DEFAULT_EXCHANGE_RATES
+from emailer import send_verification_code, send_feedback_notification
+from config import SECRET_KEY, CORS_ORIGINS, PORT, DEV_EMAIL_MODE
 
 app = Flask(__name__)
-app.secret_key = os.environ.get("SECRET_KEY", "dev-secret-change-in-production")
+app.secret_key = SECRET_KEY
 app.config['SESSION_COOKIE_HTTPONLY'] = True
 app.config['SESSION_COOKIE_SAMESITE'] = 'Lax'
 app.config['PERMANENT_SESSION_LIFETIME'] = 60 * 60 * 24 * 30
 
 CORS(app, supports_credentials=True, resources={r"/api/*": {
-    "origins": os.environ.get("CORS_ORIGINS", "*"),
+    "origins": CORS_ORIGINS,
 }})
 
 db = Database()
@@ -50,13 +52,16 @@ def api_me():
     return jsonify({"error": "Not authenticated"}), 401
 
 
+EMAIL_REGEX = re.compile(r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$')
+
+
 @app.route('/api/login', methods=['POST'])
 def api_login():
     d = request.get_json()
-    u = (d.get('username') or '').strip()
+    u = (d.get('username') or d.get('identifier') or '').strip()
     p = d.get('password') or ''
     if not u or not p:
-        return jsonify({'error': 'Username and password required'}), 400
+        return jsonify({'error': 'Username/email and password required'}), 400
     user = db.authenticate_user(u, p)
     if user:
         session["user_id"] = user["id"]
@@ -81,18 +86,115 @@ def api_users():
 def api_create_user():
     d = request.get_json()
     u = (d.get('username') or '').strip()
-    e = (d.get('email') or '').strip()
+    e = (d.get('email') or '').strip().lower()
     p = d.get('password') or ''
+    code = (d.get('verification_code') or '').strip()
+
     if not u or not e or not p:
-        return jsonify({'error': 'All fields required'}), 400
+        return jsonify({'error': 'All fields (username, email, password) required'}), 400
+    if not EMAIL_REGEX.match(e):
+        return jsonify({'error': 'Invalid email address'}), 400
+    if len(p) < 6:
+        return jsonify({'error': 'Password must be at least 6 characters'}), 400
+    if not re.match(r'^[a-zA-Z0-9_]{3,30}$', u):
+        return jsonify({'error': 'Username must be 3-30 chars, letters/numbers/underscore only'}), 400
+
+    if db.is_username_taken(u):
+        return jsonify({'error': 'Username already taken'}), 400
+    if db.is_email_taken(e):
+        return jsonify({'error': 'Email already registered'}), 400
+
+    email_verified = False
+    if code:
+        email_verified = db.verify_code(e, code, purpose='register')
+        if not email_verified:
+            return jsonify({'error': 'Invalid or expired verification code'}), 400
+    else:
+        dev_mode = DEV_EMAIL_MODE
+        if dev_mode:
+            email_verified = True
+        else:
+            return jsonify({'error': 'Email verification code required'}), 400
+
     try:
-        uid = db.create_user(u, e, p)
+        uid = db.create_user(u, e, p, email_verified=email_verified)
         user = db.get_user(uid)
         session["user_id"] = uid
         session.permanent = True
-        return jsonify({'id': uid, 'username': u, 'email': e})
+        return jsonify({'id': uid, 'username': u, 'email': e, 'email_verified': email_verified})
     except Exception as ex:
         return jsonify({'error': str(ex)}), 400
+
+
+@app.route('/api/auth/send-code', methods=['POST'])
+def api_send_code():
+    d = request.get_json()
+    e = (d.get('email') or '').strip().lower()
+    purpose = (d.get('purpose') or 'register').strip()
+    if purpose not in ('register', 'reset'):
+        return jsonify({'error': 'Invalid purpose'}), 400
+    if not e or not EMAIL_REGEX.match(e):
+        return jsonify({'error': 'Valid email required'}), 400
+
+    if purpose == 'register' and db.is_email_taken(e):
+        return jsonify({'error': 'Email already registered'}), 400
+    if purpose == 'reset' and not db.is_email_taken(e):
+        return jsonify({'error': 'No account found with that email'}), 404
+
+    if db.has_pending_code(e, purpose):
+        pass
+
+    code = db.create_verification_code(e, purpose=purpose)
+
+    dev_mode = DEV_EMAIL_MODE
+    if dev_mode:
+        return jsonify({'ok': True, 'dev_code': code, 'message': 'DEV MODE - code: ' + code})
+
+    sent = send_verification_code(e, code, purpose=purpose)
+    if not sent:
+        return jsonify({'error': 'Failed to send email. Please try again later.'}), 500
+    return jsonify({'ok': True, 'message': 'Verification code sent to ' + e})
+
+
+@app.route('/api/auth/verify-code', methods=['POST'])
+def api_verify_code():
+    d = request.get_json()
+    e = (d.get('email') or '').strip().lower()
+    code = (d.get('code') or '').strip()
+    purpose = (d.get('purpose') or 'register').strip()
+    if not e or not code:
+        return jsonify({'error': 'Email and code required'}), 400
+    ok = db.verify_code(e, code, purpose=purpose)
+    if ok:
+        return jsonify({'ok': True})
+    return jsonify({'error': 'Invalid or expired code'}), 400
+
+
+@app.route('/api/auth/reset-password', methods=['POST'])
+def api_reset_password():
+    d = request.get_json()
+    e = (d.get('email') or '').strip().lower()
+    code = (d.get('code') or '').strip()
+    new_pw = d.get('new_password') or ''
+    if not e or not code or not new_pw:
+        return jsonify({'error': 'Email, code, and new password required'}), 400
+    if len(new_pw) < 6:
+        return jsonify({'error': 'Password must be at least 6 characters'}), 400
+    if not EMAIL_REGEX.match(e):
+        return jsonify({'error': 'Invalid email'}), 400
+    if not db.is_email_taken(e):
+        return jsonify({'error': 'No account found with that email'}), 404
+
+    ok = db.verify_code(e, code, purpose='reset')
+    if not ok:
+        return jsonify({'error': 'Invalid or expired code'}), 400
+
+    db.update_user_password(e, new_pw)
+    user = db.get_user_by_email(e)
+    if user:
+        session["user_id"] = user["id"]
+        session.permanent = True
+    return jsonify({'ok': True})
 
 
 @app.route('/api/assets', methods=['GET'])
@@ -418,7 +520,45 @@ def api_template():
                      mimetype='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
 
 
+@app.route('/api/feedback', methods=['POST'])
+def api_feedback():
+    d = request.get_json()
+    uid = session.get("user_id")
+    email = (d.get('email') or '').strip().lower()
+    name = (d.get('name') or '').strip()
+    message = (d.get('message') or '').strip()
+    rating = d.get('rating')
+
+    if not message or not email:
+        return jsonify({'error': 'Email and message required'}), 400
+    if not EMAIL_REGEX.match(email):
+        return jsonify({'error': 'Invalid email'}), 400
+    if len(message) < 5:
+        return jsonify({'error': 'Message is too short'}), 400
+    if rating is not None:
+        try:
+            rating = int(rating)
+            if rating < 1 or rating > 5:
+                rating = None
+        except (TypeError, ValueError):
+            rating = None
+
+    saved_name = name
+    if not saved_name and uid:
+        user = db.get_user(uid)
+        if user:
+            saved_name = user.get('username', '')
+
+    fid = db.create_feedback(uid, email, message, rating=rating, name=saved_name)
+
+    try:
+        send_feedback_notification(saved_name or 'Anonymous', email, message, rating=rating)
+    except Exception:
+        pass
+
+    return jsonify({'ok': True, 'id': fid})
+
+
 if __name__ == '__main__':
-    port = int(os.environ.get("PORT", 5001))
-    print(f'LocusAdvisory Web Server on http://127.0.0.1:{port}')
-    app.run(host='0.0.0.0', port=port, debug=False)
+    print(f'LocusAdvisory Web Server on http://127.0.0.1:{PORT}')
+    app.run(host='0.0.0.0', port=PORT, debug=False)

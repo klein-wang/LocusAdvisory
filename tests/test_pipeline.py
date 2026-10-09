@@ -4,7 +4,7 @@ import json
 import tempfile
 import unittest
 
-sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "src"))
 
 from sow_types import SOW_TYPES, get_sow_type, list_sow_types
 from excel_parser import load_excel, SOWData, get_month_range, validate_month_format
