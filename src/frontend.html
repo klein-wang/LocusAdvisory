@@ -1024,26 +1024,48 @@ function renderForecast(result) {
   const scenarioValues = (result.scenarios || []).map(function(s) { return s.total_value; });
 
   const tv = getComputedThemeVars();
+  const sowColors = ['#ef4444', '#f59e0b', '#10b981', '#6366f1', '#8b5cf6', '#ec4899', '#14b8a6', '#f97316', '#06b6d4', '#84cc16'];
+  const datasets = [{
+    label: 'Portfolio Total',
+    data: scenarioValues,
+    borderColor: '#1e40af',
+    backgroundColor: 'rgba(30, 64, 175, 0.15)',
+    fill: true,
+    tension: 0.3,
+    pointRadius: 3,
+    pointHoverRadius: 6,
+    borderWidth: 3,
+  }];
+
+  const sowCurves = result.sow_curves || {};
+  let ci = 0;
+  for (const sowName in sowCurves) {
+    const curve = sowCurves[sowName];
+    if (!curve || curve.length === 0) continue;
+    datasets.push({
+      label: sowName,
+      data: curve,
+      borderColor: sowColors[ci % sowColors.length],
+      backgroundColor: 'transparent',
+      fill: false,
+      tension: 0.3,
+      pointRadius: 2,
+      pointHoverRadius: 5,
+      borderWidth: 2,
+      borderDash: [5, 0],
+    });
+    ci++;
+  }
+
   charts.trend = new Chart(trendCtx, {
     type: 'line',
-    data: {
-      labels: labels,
-      datasets: [{
-        label: 'Portfolio Value',
-        data: scenarioValues,
-        borderColor: '#1e40af',
-        backgroundColor: 'rgba(30, 64, 175, 0.1)',
-        fill: true,
-        tension: 0.3,
-        pointRadius: 3,
-        pointHoverRadius: 6,
-      }]
-    },
+    data: { labels: labels, datasets: datasets },
     options: {
       responsive: true,
       maintainAspectRatio: false,
+      interaction: { mode: 'index', intersect: false },
       plugins: {
-        legend: { labels: { color: tv.chartText } }
+        legend: { labels: { color: tv.chartText, boxWidth: 12 } }
       },
       scales: {
         x: { grid: { color: tv.chartGrid }, ticks: { color: tv.chartText } },

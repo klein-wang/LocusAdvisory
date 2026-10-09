@@ -8,7 +8,7 @@ from db import Database
 from db_loader import load_user_sow_data
 from main import run_pipeline_from_sow_list
 from sow_types import SOW_TYPES
-from currencies import CURRENCIES, DEFAULT_CURRENCY, DEFAULT_EXCHANGE_RATES
+from currencies import CURRENCIES, DEFAULT_CURRENCY, DEFAULT_EXCHANGE_RATES, convert_to_currency
 from emailer import send_verification_code, send_feedback_notification
 from config import SECRET_KEY, CORS_ORIGINS, PORT, DEV_EMAIL_MODE
 
@@ -329,6 +329,8 @@ def api_forecast():
         currency_rates=currency_rates,
     )
 
+    effective_rates = currency_rates if currency_rates else dict(DEFAULT_EXCHANGE_RATES)
+
     monthly_totals = result.get('monthly_totals', {})
     sorted_months = sorted(monthly_totals.keys())
     scenarios = [{'month': m, 'total_value': monthly_totals[m]} for m in sorted_months]
@@ -344,12 +346,24 @@ def api_forecast():
             row[sow_name] = round(pct_map.get(m, 0.0), 2)
         breakdown.append(row)
 
+    sow_currency_map = {s.name: s.currency for s in sow_list}
+    sow_curves = {}
+    forecasts_dict = result.get('forecasts', {})
+    for sow_name, months_data in forecasts_dict.items():
+        sow_cur = sow_currency_map.get(sow_name, display_currency)
+        curve = []
+        for m in sorted_months:
+            native_val = months_data.get(m, 0.0)
+            curve.append(round(convert_to_currency(native_val, sow_cur, display_currency, effective_rates), 2))
+        sow_curves[sow_name] = curve
+
     result['scenarios'] = scenarios
     result['starting_value'] = round(starting_value, 2)
     result['final_value'] = round(final_value, 2)
     result['total_growth'] = round(total_growth, 4)
     result['forecast_breakdown'] = breakdown
     result['stochastic'] = d.get('stochastic', False)
+    result['sow_curves'] = sow_curves
 
     stoch_summary = result.get('stochastic_summary', {})
     portfolio = stoch_summary.get('portfolio', {})
@@ -360,6 +374,7 @@ def api_forecast():
         result['confidence_95'] = round(mc_end.get('p95', 0), 2)
 
     return jsonify(result)
+
 
 
 @app.route('/api/settings', methods=['GET'])
